@@ -1,0 +1,13 @@
+# Short-description: Create image for eMMC
+# Long-description: Creates a image that can be used to write to eMMC for RZ boards
+#                   First partition contains files of bootloader and related components
+#                   Second partition contains rootfs, as well as Linux image and devicetree
+#                   Note: the bootloader in first partition cannot be used for eMMC boot. In eMMC boot
+#                         user has to manually write the bootloader to mmcblk0boot0.
+
+part --source rawcopy --sourceparams="file=bl2-tbb_bp_esd-${MACHINE}.bin" --no-table
+part --source rawcopy --sourceparams="file=bl2-tbb_${MACHINE}.bin" --no-table --offset 8s --align 4
+part --source rawcopy --sourceparams="file=fip-tbb-${MACHINE}.bin" --no-table --offset 128s --align 64
+
+part --source bootimg-partition --fstype=vfat --label bootloader --align 2048
+part --source rootfs            --fstype=ext4 --label root            --align 4

@@ -1,0 +1,68 @@
+From b056e1cf16bc0e45341c0ce4241fe82e10ee12fd Mon Sep 17 00:00:00 2001
+From: Yoshifumi Ohtsuka <yoshifumi.ohtsuka.gx@bp.renesas.com>
+Date: Tue, 22 Apr 2025 20:52:23 +0900
+Subject: [PATCH] Changed CONFIG_ENV_OFFSET from 0xF0000 to 0x200000 to adjust
+ the environment variable storage location in eMMC/eSD.
+
+---
+ configs/smarc-rzg2l_defconfig  | 2 +-
+ configs/smarc-rzg2lc_defconfig | 2 +-
+ configs/smarc-rzg2ul_defconfig | 2 +-
+ configs/smarc-rzv2l_defconfig  | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/configs/smarc-rzg2l_defconfig b/configs/smarc-rzg2l_defconfig
+index d50c5851..56a92c3d 100644
+--- a/configs/smarc-rzg2l_defconfig
++++ b/configs/smarc-rzg2l_defconfig
+@@ -3,7 +3,7 @@ CONFIG_ARCH_CPU_INIT=y
+ CONFIG_ARCH_RMOBILE=y
+ CONFIG_SYS_TEXT_BASE=0x50000000
+ CONFIG_ENV_SIZE=0x10000
+-CONFIG_ENV_OFFSET=0xF0000
++CONFIG_ENV_OFFSET=0x1F0000
+ CONFIG_DM_GPIO=y
+ CONFIG_RCAR_GEN3=y
+ CONFIG_R9A07G044L=y
+diff --git a/configs/smarc-rzg2lc_defconfig b/configs/smarc-rzg2lc_defconfig
+index eacbd42f..c8afbbc1 100644
+--- a/configs/smarc-rzg2lc_defconfig
++++ b/configs/smarc-rzg2lc_defconfig
+@@ -3,7 +3,7 @@ CONFIG_ARCH_CPU_INIT=y
+ CONFIG_ARCH_RMOBILE=y
+ CONFIG_SYS_TEXT_BASE=0x50000000
+ CONFIG_ENV_SIZE=0x10000
+-CONFIG_ENV_OFFSET=0xF0000
++CONFIG_ENV_OFFSET=0x1F0000
+ CONFIG_DM_GPIO=y
+ CONFIG_RCAR_GEN3=y
+ CONFIG_R9A07G044C=y
+diff --git a/configs/smarc-rzg2ul_defconfig b/configs/smarc-rzg2ul_defconfig
+index 90f35b72..b95b01a7 100644
+--- a/configs/smarc-rzg2ul_defconfig
++++ b/configs/smarc-rzg2ul_defconfig
+@@ -3,7 +3,7 @@ CONFIG_ARCH_CPU_INIT=y
+ CONFIG_ARCH_RMOBILE=y
+ CONFIG_SYS_TEXT_BASE=0x50000000
+ CONFIG_ENV_SIZE=0x10000
+-CONFIG_ENV_OFFSET=0xF0000
++CONFIG_ENV_OFFSET=0x1F0000
+ CONFIG_DM_GPIO=y
+ CONFIG_RCAR_GEN3=y
+ CONFIG_R9A07G043U=y
+diff --git a/configs/smarc-rzv2l_defconfig b/configs/smarc-rzv2l_defconfig
+index 1e24cce4..f45deb46 100644
+--- a/configs/smarc-rzv2l_defconfig
++++ b/configs/smarc-rzv2l_defconfig
+@@ -3,7 +3,7 @@ CONFIG_ARCH_CPU_INIT=y
+ CONFIG_ARCH_RMOBILE=y
+ CONFIG_SYS_TEXT_BASE=0x50000000
+ CONFIG_ENV_SIZE=0x10000
+-CONFIG_ENV_OFFSET=0xF0000
++CONFIG_ENV_OFFSET=0x1F0000
+ CONFIG_DM_GPIO=y
+ CONFIG_RCAR_GEN3=y
+ CONFIG_R9A07G054L=y
+-- 
+2.34.1
+

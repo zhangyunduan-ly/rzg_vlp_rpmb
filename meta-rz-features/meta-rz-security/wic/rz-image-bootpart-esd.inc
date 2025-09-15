@@ -1,0 +1,6 @@
+WKS_FILE:sboot				= "rz-image-bootpart-esd_tbb.wks"
+WKS_FILE:sboot:smarc-rzg2l	= "rz-image-bootpart-esd_tbb-pmic.wks"
+WKS_FILE:sboot:smarc-rzv2l	= "rz-image-bootpart-esd_tbb-pmic.wks"
+WKS_FILE:sboot:smarc-rzg2ul	= "rz-image-bootpart-esd_tbb-rzg2ul-rzg2lc.wks"
+WKS_FILE:sboot:smarc-rzg2lc	= "rz-image-bootpart-esd_tbb-rzg2ul-rzg2lc.wks"
+WKS_FILE:sboot:smarc-rzg3s	= "rz-image-bootpart-esd_tbb-rzg3s.wks"

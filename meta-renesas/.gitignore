@@ -1,0 +1,8 @@
+*.swp
+.config.yaml
+.config.yaml.old
+build
+meta-arm
+meta-openembedded
+meta-rz-features
+poky

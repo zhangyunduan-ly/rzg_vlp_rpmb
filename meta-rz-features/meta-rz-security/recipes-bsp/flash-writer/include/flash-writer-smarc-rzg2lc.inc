@@ -1,0 +1,1 @@
+require flash-writer-smarc-rzg2l.inc
