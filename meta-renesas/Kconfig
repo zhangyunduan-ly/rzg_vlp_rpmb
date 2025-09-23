@@ -41,6 +41,11 @@ choice
 	depends on MACHINE_SMARC-RZG2LC
 	default "kas/machines/smarc-rzg2lc.yml"
 
+	config KAS_INCLUDE_MACHINE_LY-RZG2LC
+	string
+	depends on MACHINE_LY-RZG2LC
+	default "kas/machines/ly-rzg2lc.yml"
+
 	config MACHINE_SMARC-RZG2UL
 	bool "smarc-rzg2ul"
 	select FAMILY_G2L

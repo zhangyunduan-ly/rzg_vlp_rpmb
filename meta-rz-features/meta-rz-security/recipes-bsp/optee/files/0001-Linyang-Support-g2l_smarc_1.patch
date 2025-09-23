@@ -1,0 +1,30 @@
+diff --git a/core/arch/arm/plat-rz/conf.mk b/core/arch/arm/plat-rz/conf.mk
+index ec33571d..b484c147 100644
+--- a/core/arch/arm/plat-rz/conf.mk
++++ b/core/arch/arm/plat-rz/conf.mk
+@@ -12,6 +12,9 @@ include core/arch/arm/plat-rz/g2l/rzg2l_conf.mk
+ else ifeq ($(PLATFORM_FLAVOR),g2lc_smarc_1)
+ $(call force,CFG_PLATFORM_GROUP_g2l,y)
+ include core/arch/arm/plat-rz/g2l/rzg2l_conf.mk
++else ifeq ($(PLATFORM_FLAVOR),g2l_smarc_1)
++$(call force,CFG_PLATFORM_GROUP_g2l,y)
++include core/arch/arm/plat-rz/g2l/rzg2l_conf.mk
+ else ifeq ($(PLATFORM_FLAVOR),g2l_smarc_2)
+ $(call force,CFG_PLATFORM_GROUP_g2l,y)
+ include core/arch/arm/plat-rz/g2l/rzg2l_conf.mk
+diff --git a/core/arch/arm/plat-rz/g2l/rzg2l_config.h b/core/arch/arm/plat-rz/g2l/rzg2l_config.h
+index 5165821e..95732448 100644
+--- a/core/arch/arm/plat-rz/g2l/rzg2l_config.h
++++ b/core/arch/arm/plat-rz/g2l/rzg2l_config.h
+@@ -55,6 +55,11 @@
+ #define NSEC_DDR_0_BASE		0x47E00000U
+ #define NSEC_DDR_0_SIZE		0x38200000
+ 
++#elif defined(PLATFORM_FLAVOR_g2l_smarc_1)
++/* DDR 1Gbyte x1 */
++#define NSEC_DDR_0_BASE		0x47E00000U
++#define NSEC_DDR_0_SIZE		0x38200000
++
+ #elif defined(PLATFORM_FLAVOR_g2l_smarc_2)
+ /* DDR 1Gbyte x2 */
+ #define NSEC_DDR_0_BASE		0x47E00000U

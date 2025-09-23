@@ -1,0 +1,10 @@
+[Unit]
+Description=System Monitor
+After=dev-%i.device
+
+[Service]
+ExecStart=/bin/sh /etc/system-monitor.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

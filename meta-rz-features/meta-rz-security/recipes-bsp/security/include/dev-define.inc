@@ -1,4 +1,5 @@
 DEV:smarc-rzg2l		= "g2l"
+DEV:ly-rzg2l		= "g2l"
 DEV:smarc-rzg2lc	= "g2l"
 DEV:smarc-rzg2ul	= "g2l"
 DEV:smarc-rzg3s		= "g3s"
