@@ -1,0 +1,2 @@
+SUBSYSTEM=="net", ACTION=="add", KERNELS=="11c20000.ethernet", NAME="eth0"
+SUBSYSTEM=="net", ACTION=="add", KERNELS=="11c30000.ethernet", NAME="eth1"

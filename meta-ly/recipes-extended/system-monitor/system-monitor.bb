@@ -12,12 +12,13 @@ inherit systemd
 S = "${WORKDIR}"
 
 do_install() {
-	install -d ${D}${systemd_unitdir}/system
-	install -m 0644 ${S}/system-monitor.service ${D}${systemd_unitdir}/system/
+	install -d ${D}${systemd_system_unitdir}
+	install -m 0644 ${S}/system-monitor.service ${D}${systemd_system_unitdir}/
 	install -d ${D}${sysconfdir}
 	install -m 0755 ${S}/system-monitor.sh ${D}${sysconfdir}/
 }
 
-FILES_${PN} += "${systemd_unitdir}/system/system-monitor.service"
+FILES:${PN} += "${systemd_system_unitdir}/system-monitor.service"
+FILES:${PN} += "${sysconfdir}/system-monitor.sh"
 
 SYSTEMD_SERVICE_${PN} = "system-monitor.service"

@@ -1,9 +1,0 @@
-[Match]
-Name=end0
-
-[Network]
-Address=192.168.8.203/24
-DNS=8.8.8.8
-
-[Route]
-Gateway=192.168.8.1
