@@ -14,4 +14,18 @@ do_install:append() {
 	install -m 0644 ${WORKDIR}/70-persistent-net.rules ${D}${sysconfdir}/udev/rules.d/
 }
 
-SYSTEMD_SERVICE_DISABLE += "systemd-networkd-wait-online.service"
+SYSTEMD_SERVICE:${PN}:append = " systemd-networkd-wait-online.service"
+
+do_install:append() {
+    # 创建服务覆盖目录
+    install -d ${D}${systemd_system_unitdir}/systemd-networkd-wait-online.service.d
+    
+    # 创建禁用配置
+    cat > ${D}${systemd_system_unitdir}/systemd-networkd-wait-online.service.d/disable.conf << EOF
+[Unit]
+ConditionNull=
+
+[Install]
+WantedBy=
+EOF
+}
