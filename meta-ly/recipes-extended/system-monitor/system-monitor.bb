@@ -21,4 +21,5 @@ do_install() {
 FILES:${PN} += "${systemd_system_unitdir}/system-monitor.service"
 FILES:${PN} += "${sysconfdir}/system-monitor.sh"
 
-SYSTEMD_SERVICE_${PN} = "system-monitor.service"
+SYSTEMD_SERVICE:${PN} = "system-monitor.service"
+SYSTEMD_AUTO_ENABLE:${PN} = "enable"
