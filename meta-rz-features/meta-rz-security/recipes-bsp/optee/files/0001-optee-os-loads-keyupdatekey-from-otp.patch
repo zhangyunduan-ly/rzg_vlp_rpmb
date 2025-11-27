@@ -1,0 +1,50 @@
+diff --git a/core/arch/arm/plat-rz/common/pta/tsip/pta_sce.c b/core/arch/arm/plat-rz/common/pta/tsip/pta_sce.c
+index 12f4b728..b3917191 100644
+--- a/core/arch/arm/plat-rz/common/pta/tsip/pta_sce.c
++++ b/core/arch/arm/plat-rz/common/pta/tsip/pta_sce.c
+@@ -8,7 +8,7 @@
+ #include <platform_config.h>
+ 
+ #include <r_sce.h>
+-#include <sflash.h>
++#include <otp_drv.h>
+ #include <pta_sce.h>
+ 
+ #define PTA_NAME "sce.pta"
+@@ -1019,9 +1019,7 @@ static TEE_Result open_session(uint32_t nParamTypes __unused,
+ 							   void **ppSessionContext __unused)
+ {
+ 	DMSG("open entry point for pseudo ta \"%s\"", PTA_NAME);
+-	sflash_open();
+-	sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
+-	sflash_close();
++	r_otp_read(OTP_KEYUPDATEKEY, (uint32_t *)&key_update_key, sizeof(key_update_key) / sizeof(uint32_t));
+ 	return TEE_SUCCESS;
+ }
+ 
+diff --git a/core/arch/arm/plat-rz/g2l/drivers/sub.mk b/core/arch/arm/plat-rz/g2l/drivers/sub.mk
+index 7df3511a..7d4a1786 100644
+--- a/core/arch/arm/plat-rz/g2l/drivers/sub.mk
++++ b/core/arch/arm/plat-rz/g2l/drivers/sub.mk
+@@ -1,3 +1,3 @@
+ global-incdirs-y += .
+ 
+-srcs-y += cpg.c
++srcs-y += cpg.c otp_drv.c otp/otp_sys.c
+diff --git a/core/arch/arm/plat-rz/g2l/rzg2l_config.h b/core/arch/arm/plat-rz/g2l/rzg2l_config.h
+index 95732448..f939e997 100644
+--- a/core/arch/arm/plat-rz/g2l/rzg2l_config.h
++++ b/core/arch/arm/plat-rz/g2l/rzg2l_config.h
+@@ -29,6 +29,12 @@
+ #define SCE_REG_BASE		0x11850000
+ #define SCE_REG_SIZE		0x10000
+ 
++#define OTP_BASE			0x11860000
++#define OTP_REG_SIZE		0x10000
++
++#define OTP_DUMMYREAD		0x100
++#define OTP_KEYUPDATEKEY	0x160
++
+ #if defined(PLATFORM_FLAVOR_g2l_dev13_1)
+ /* DDR 512Mbyte x2 */
+ #define NSEC_DDR_0_BASE		0x47E00000U
