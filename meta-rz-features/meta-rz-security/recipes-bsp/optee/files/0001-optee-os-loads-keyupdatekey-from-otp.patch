@@ -31,6 +31,493 @@ index 7df3511a..7d4a1786 100644
  
 -srcs-y += cpg.c
 +srcs-y += cpg.c otp_drv.c otp/otp_sys.c
+diff --git a/core/arch/arm/plat-rz/g2l/drivers/otp/otp_regs.h b/core/arch/arm/plat-rz/g2l/drivers/otp/otp_regs.h
+new file mode 100644
+index 00000000..8ff5996a
+--- /dev/null
++++ b/core/arch/arm/plat-rz/g2l/drivers/otp/otp_regs.h
+@@ -0,0 +1,163 @@
++/*
++ * Copyright (c) 2020-2025 Renesas Electronics Corporation. All rights reserved.
++ *
++ * SPDX-License-Identifier: BSD-3-Clause
++ */
++
++/**********************************************************************************************************************
++ * File Name    : otp_regs.h
++ * Description  : OTP IO registers
++ *********************************************************************************************************************/
++
++/**********************************************************************************************************************
++ Includes   <System Includes> , "Project Includes"
++ *********************************************************************************************************************/
++#include <stdint.h>
++#include <stdbool.h>
++
++/**********************************************************************************************************************
++ Macro definitions
++ *********************************************************************************************************************/
++
++#ifndef OTP_REGS_H
++#define OTP_REGS_H
++
++#define OTP_OTPPWR_PWR      (1 << 0)
++#define OTP_OTPPWR_ACCL     (1 << 4)
++#define OTP_OTPPWR_MASK     (0x00000011)
++
++#define OTP_IP_ADDR_MIN     (0x0)
++#define OTP_IP_ADDR_MAX     (0x1FFU)
++
++/**********************************************************************************************************************
++ Global Typedef definitions
++ *********************************************************************************************************************/
++struct st_otp
++{
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    PWR:1;
++            uint32_t    :3;
++            uint32_t    ACCL:1;
++            uint32_t    :27;
++        } BIT;
++    } OTPPWR;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    CMD_RDY:1;
++            uint32_t    ERR_WR:2;
++            uint32_t    ERR_WP:1;
++            uint32_t    ERR_RP:1;
++            uint32_t    :3;
++            uint32_t    ERR_RDY_WR:1;
++            uint32_t    ERR_RDY_RD:1;
++            uint32_t    :22;
++        } BIT;
++    } OTPSTR;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    STAWR:1;
++            uint32_t    :31;
++        } BIT;
++    } OTPSTAWR;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    ADRWR:9;
++            uint32_t    :23;
++        } BIT;
++    } OTPADRWR;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    DATAWR:32;
++        } BIT;
++    } OTPDATAWR;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    ADRRD:9;
++            uint32_t    :23;
++        } BIT;
++    } OTPADRRD;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    DATARD:32;
++        } BIT;
++    } OTPDATARD;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    OTPFLAG:1;
++            uint32_t    :31;
++        } BIT;
++    } OTPFLAG;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    SECINTEN:1;
++            uint32_t    DEDINTEN:1;
++            uint32_t    :30;
++        } BIT;
++    } OTPINTEN;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    SECINTSTS:1;
++            uint32_t    DEDINTSTS:1;
++            uint32_t    :30;
++        } BIT;
++    } OTPINTSTS;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    SECADDR:9;
++            uint32_t    :23;
++        } BIT;
++    } OTPSECADDR;
++    union
++    {
++        uint32_t    WORD;
++        struct
++        {
++            uint32_t    DEDADDR:9;
++            uint32_t    :23;
++        } BIT;
++    } OTPDEDADDR;
++};
++
++/**********************************************************************************************************************
++ External global variables
++ *********************************************************************************************************************/
++
++/**********************************************************************************************************************
++ Exported global functions
++ *********************************************************************************************************************/
++
++#endif /* OTP_REGS_H */
+\ No newline at end of file
+diff --git a/core/arch/arm/plat-rz/g2l/drivers/otp/otp_sys.c b/core/arch/arm/plat-rz/g2l/drivers/otp/otp_sys.c
+new file mode 100644
+index 00000000..743a7b49
+--- /dev/null
++++ b/core/arch/arm/plat-rz/g2l/drivers/otp/otp_sys.c
+@@ -0,0 +1,212 @@
++// SPDX-License-Identifier: BSD-3-Clause
++/*
++ * Copyright (c) 2020-2025 Renesas Electronics Corporation. All rights reserved.
++ */
++
++#include <initcall.h>
++#include <mm/core_memprot.h>
++#include <rzg2l_config.h>
++#include "otp_regs.h"
++#include "otp_sys.h"
++
++#define OTP (*(volatile struct st_otp *) otp_base)
++
++register_phys_mem_pgdir(MEM_AREA_IO_SEC, OTP_BASE, OTP_REG_SIZE);
++
++static vaddr_t otp_base;
++
++static void otp_dummy_read (void);
++
++int32_t otp_open(void)
++{
++    int32_t ret_val = OTP_NO_ERRORS;
++
++    if (0 != OTP.OTPPWR.BIT.PWR)
++    {
++        ret_val = OTP_ALREADY_POWER_UP;
++    }
++    else
++    {
++        while ((0 != OTP.OTPSTR.BIT.CMD_RDY) || (1 != OTP.OTPFLAG.BIT.OTPFLAG))
++        {
++            ; /* wait */
++        }
++
++        OTP.OTPPWR.WORD = OTP_OTPPWR_MASK & (OTP_OTPPWR_PWR | OTP_OTPPWR_ACCL); /* APB I/F enable */
++
++        while (1 != OTP.OTPSTR.BIT.CMD_RDY)
++        {
++            ; /* wait */
++        }
++    }
++
++    return ret_val;
++}
++
++void otp_close(void)
++{
++    otp_dummy_read();
++
++    OTP.OTPPWR.WORD = OTP_OTPPWR_MASK & ~(OTP_OTPPWR_PWR | OTP_OTPPWR_ACCL); /* APB I/F disable */
++
++    while (0 != OTP.OTPSTR.BIT.CMD_RDY)
++    {
++        ; /* wait */
++    }
++
++    return;
++}
++
++int32_t otp_read(const uint32_t addr, uint32_t * const value)
++{
++    int32_t ret_val = OTP_NO_ERRORS;
++
++    if ((addr < OTP_IP_ADDR_MIN) || (addr > OTP_IP_ADDR_MAX))
++    {
++        ret_val = OTP_ADDRESS_INVALID;
++    }
++    else
++    {
++        while (1 != OTP.OTPSTR.BIT.CMD_RDY)
++        {
++            ; /* Polling */
++        }
++
++        /* set word address to OTPADRRD */
++        OTP.OTPADRRD.WORD = addr;
++
++        *value = OTP.OTPDATARD.WORD;
++
++        if (0 != OTP.OTPSTR.BIT.ERR_RDY_RD)
++        {
++            OTP.OTPSTR.BIT.ERR_RDY_RD = 0;
++            ret_val = OTP_COMMAND_NOT_READY;
++        }
++        else
++        {
++            if (0 != OTP.OTPSTR.BIT.ERR_RP)
++            {
++                ret_val = OTP_PROTECTION_ERROR; /* must be close. */
++            }
++            else
++            {
++                if (0 != OTP.OTPINTSTS.BIT.SECINTSTS)
++                {
++                    ret_val = OTP_ECC_SIGLE_COLLECTION;
++                }
++                else if (0 != OTP.OTPINTSTS.BIT.DEDINTSTS)
++                {
++                    ret_val = OTP_ECC_DOUBLE_DETECTION;
++                }
++                else
++                {
++                    ; /* no error */
++                }
++            }
++        }
++    }
++
++    return ret_val;
++}
++
++int32_t otp_write(const uint32_t addr, const uint32_t value)
++{
++    int32_t ret_val = OTP_NO_ERRORS;
++
++    if ((addr < OTP_IP_ADDR_MIN) || (addr > OTP_IP_ADDR_MAX))
++    {
++        ret_val = OTP_ADDRESS_INVALID;
++    }
++    else
++    {
++        while (1 != OTP.OTPSTR.BIT.CMD_RDY)
++        {
++            ; /* Polling */
++        }
++
++        /* set word address to OTPADRRD */
++        OTP.OTPADRWR.WORD = addr;
++
++        OTP.OTPDATAWR.WORD = value;
++
++        OTP.OTPSTAWR.BIT.STAWR = 1;
++
++        if (0 != OTP.OTPSTR.BIT.ERR_RDY_WR)
++        {
++            OTP.OTPSTR.BIT.ERR_RDY_WR = 0;
++            ret_val = OTP_COMMAND_NOT_READY;
++        }
++        else
++        {
++            while ((1 != OTP.OTPSTR.BIT.CMD_RDY) || (0 != OTP.OTPSTAWR.BIT.STAWR))
++            {
++                ; /* Polling */
++            }
++
++            if ((0 != OTP.OTPSTR.BIT.ERR_WP) || (0 != OTP.OTPSTR.BIT.ERR_WR))
++            {
++                ret_val = OTP_PROTECTION_ERROR; /* must be close. */
++            }
++            else
++            {
++                uint32_t read_value;
++
++                ret_val = otp_read(addr, &read_value);
++
++                if ((OTP_NO_ERRORS == ret_val) && (read_value != value))
++                {
++                    ret_val = OTP_VERIFY_ERROR;
++                }
++            }
++        }
++    }
++
++    return ret_val;
++}
++
++static void otp_dummy_read(void)
++{
++    volatile uint32_t value;
++
++    while (1 != OTP.OTPSTR.BIT.CMD_RDY)
++    {
++        ; /* Polling */
++    }
++
++    OTP.OTPADRRD.WORD = OTP_DUMMYREAD;
++
++    value = OTP.OTPDATARD.WORD;
++
++    return;
++}
++
++uint32_t err_int_clear(void)
++{
++    uint32_t ret_val = 0xffffffff;
++
++    if (0 != OTP.OTPINTSTS.BIT.SECINTSTS)
++    {
++        OTP.OTPINTSTS.BIT.SECINTSTS = 0;        /* clear status */
++        ret_val = OTP.OTPSECADDR.WORD;          /* ecc single collection address. */
++    }
++    else if (0 != OTP.OTPINTSTS.BIT.DEDINTSTS)
++    {
++        OTP.OTPINTSTS.BIT.DEDINTSTS = 0;        /* clear status */
++        ret_val = OTP.OTPDEDADDR.WORD;          /* ecc double collection address. */
++    }
++    else
++    {
++        ; /* no error */
++    }
++
++    return ret_val;
++}
++
++static TEE_Result otp_init(void)
++{
++        otp_base = (vaddr_t)phys_to_virt_io(OTP_BASE, OTP_REG_SIZE);
++
++        return TEE_SUCCESS;
++}
++
++service_init(otp_init);
+\ No newline at end of file
+diff --git a/core/arch/arm/plat-rz/g2l/drivers/otp/otp_sys.h b/core/arch/arm/plat-rz/g2l/drivers/otp/otp_sys.h
+new file mode 100644
+index 00000000..ff0f3d6b
+--- /dev/null
++++ b/core/arch/arm/plat-rz/g2l/drivers/otp/otp_sys.h
+@@ -0,0 +1,33 @@
++/* SPDX-License-Identifier: BSD-3-Clause */
++/*
++ * Copyright (c) 2020-2025, Renesas Electronics Corporation
++ */
++
++#include <stdint.h>
++#include <stddef.h>
++
++#ifndef OTP_SYS_H
++#define OTP_SYS_H
++
++/* OTP error/status types */
++#define OTP_NO_ERRORS               (0)
++#define OTP_ALREADY_POWER_UP        (-1)
++#define OTP_ADDRESS_INVALID         (-1)
++#define OTP_PROTECTION_ERROR        (-2)
++#define OTP_ECC_SIGLE_COLLECTION    (-3)
++#define OTP_ECC_DOUBLE_DETECTION    (-4)
++#define OTP_VERIFY_ERROR            (-5)
++#define OTP_COMMAND_NOT_READY       (-6)
++
++/* Open the OTP */
++extern int32_t otp_open(void);
++/* Close the OTP */
++extern void otp_close(void);
++/* Read the value from the OTP */
++extern int32_t otp_write(const uint32_t addr, const uint32_t value);
++/* Write the value to OTP */
++extern int32_t otp_read(const uint32_t addr, uint32_t * const value);
++/* Clear error interrupt flag. */
++extern uint32_t err_int_clear(void);
++
++#endif /* OTP_SYS_H */
+\ No newline at end of file
+diff --git a/core/arch/arm/plat-rz/g2l/drivers/otp_drv.c b/core/arch/arm/plat-rz/g2l/drivers/otp_drv.c
+new file mode 100644
+index 00000000..d9fef88a
+--- /dev/null
++++ b/core/arch/arm/plat-rz/g2l/drivers/otp_drv.c
+@@ -0,0 +1,29 @@
++// SPDX-License-Identifier: BSD-3-Clause
++/*
++ * Copyright (c) 2025 Renesas Electronics Corporation. All rights reserved.
++ */
++
++#include <otp_drv.h>
++#include <otp/otp_sys.h>
++
++bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count)
++{
++    bool ret = false;
++
++    if (OTP_NO_ERRORS == otp_open()) {
++
++        int32_t err_val = 0;
++
++        for (int32_t i = 0; ((i < count) && (OTP_NO_ERRORS == err_val)); i++)
++        {
++            err_val = otp_read (addr + i, &p_value[i]);
++        }
++
++        if (OTP_NO_ERRORS == err_val)
++        {
++            ret = true;
++        }
++        otp_close();
++    }
++    return ret;
++}
+\ No newline at end of file
+diff --git a/core/arch/arm/plat-rz/g2l/drivers/otp_drv.h b/core/arch/arm/plat-rz/g2l/drivers/otp_drv.h
+new file mode 100644
+index 00000000..15b02094
+--- /dev/null
++++ b/core/arch/arm/plat-rz/g2l/drivers/otp_drv.h
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: BSD-3-Clause */
++/*
++ * Copyright (c) 2023, Renesas Electronics Corporation
++ */
++
++#ifndef __OTP_DRV_H__
++#define __OTP_DRV_H__
++
++#include <stdint.h>
++#include <stdbool.h>
++
++
++extern bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count);
++
++#endif /* __OTP_DRV_H__ */
+\ No newline at end of file
 diff --git a/core/arch/arm/plat-rz/g2l/rzg2l_config.h b/core/arch/arm/plat-rz/g2l/rzg2l_config.h
 index 95732448..f939e997 100644
 --- a/core/arch/arm/plat-rz/g2l/rzg2l_config.h
