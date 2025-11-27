@@ -17,7 +17,7 @@ S = "${WORKDIR}/git"
 
 inherit cmake ptest
 
-PACKAGECONFIG ??= "gcrypt ${@bb.utils.contains('PTEST_ENABLED', '1', 'tests', '', d)}"
+PACKAGECONFIG ??= "${@bb.utils.contains('PTEST_ENABLED', '1', 'tests', '', d)}"
 PACKAGECONFIG[gssapi] = "-DWITH_GSSAPI=1, -DWITH_GSSAPI=0, krb5, "
 PACKAGECONFIG[gcrypt] = "-DWITH_GCRYPT=1, -DWITH_GCRYPT=0, libgcrypt, "
 PACKAGECONFIG[tests] = "-DUNIT_TESTING=1, -DUNIT_TESTING=0, cmocka"
@@ -29,6 +29,7 @@ EXTRA_OECMAKE = " \
     -DWITH_SFTP=1 \
     -DWITH_ZLIB=1 \
     -DWITH_EXAMPLES=0 \
+    -DWITH_GCRYPT=0 \
     "
 
 do_compile:prepend () {
