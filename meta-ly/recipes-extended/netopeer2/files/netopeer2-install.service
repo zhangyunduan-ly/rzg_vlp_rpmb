@@ -1,0 +1,15 @@
+[Unit]
+Description=netopeer2 install
+After=sysrepo-plugind
+ConditionPathExists=!/var/lib/netopeer2_install.lock
+
+[Service]
+User=root
+Type=oneshot
+ExecStart=-/bin/systemctl stop netopeer2-server
+ExecStart=/bin/bash /usr/share/netopeer2/scripts/install.sh
+ExecStart=-/bin/systemctl enable netopeer2-server
+ExecStart=/bin/systemctl start netopeer2-server
+
+[Install]
+WantedBy=multi-user.target
