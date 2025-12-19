@@ -1,0 +1,14 @@
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", \
+  ATTRS{interface}=="Mobile AT Interface", \
+  ATTRS{bInterfaceNumber}=="00", \
+  SYMLINK+="ttyGPRSDiag"
+
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", \
+  ATTRS{interface}=="Mobile AT Interface", \
+  ATTRS{bInterfaceNumber}=="01", \
+  SYMLINK+="ttyGPRSAT"
+
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", \
+  ATTRS{interface}=="Mobile AT Interface", \
+  ATTRS{bInterfaceNumber}=="02", \
+  SYMLINK+="ttyGPRSModem"
