@@ -1,0 +1,9 @@
+[Unit]
+Description=RTK Hciattach
+After=dev-%i.device
+
+[Service]
+ExecStart=/usr/bin/rtk_hciattach -n -s 115200 ttySC3 rtk_h5
+
+[Install]
+WantedBy=multi-user.target

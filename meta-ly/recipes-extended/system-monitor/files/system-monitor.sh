@@ -33,9 +33,6 @@ INSTALLFILE=$upgradePath/install.sh
 curCpuFreq=0
 cpuMonitorInterval=0
 
-# Bluetooth serial device
-RtkHciDevice=ttySC3
-
 # 上锁防止多sh运行
 lockFile="/tmp/lockFile"
 if [ -f ${lockFile} ]
@@ -349,18 +346,9 @@ function rtl8821cs_loglevel_set()
 	fi
 }
 
-# Configure Realtek Bluetooth communication parameters
-function rtk_hci_start()
-{
-	if modinfo hci_uart >/dev/null 2>&1; then
-		rtk_hciattach -n -s 115200 $RtkHciDevice rtk_h5 &
-	fi
-}
-
 echo "system monitor will running !!!"
 
 rtl8821cs_loglevel_set
-rtk_hci_start
 
 while true
 do
