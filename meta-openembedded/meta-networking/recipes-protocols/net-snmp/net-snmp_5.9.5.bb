@@ -19,20 +19,19 @@ SRC_URI = "${SOURCEFORGE_MIRROR}/net-snmp/net-snmp-${PV}.tar.gz \
            file://0002-net-snmp-fix-libtool-finish.patch \
            file://0003-testing-add-the-output-format-for-ptest.patch \
            file://0004-config_os_headers-Error-Fix.patch \
-           file://0005-snmplib-keytools.c-Don-t-check-for-return-from-EVP_M.patch \
            file://0006-get_pid_from_inode-Include-limit.h.patch \
            file://0007-configure-fix-incorrect-variable.patch \
-           file://0008-net-snmp-fix-engineBoots-value-on-SIGHUP.patch \
            file://0009-net-snmp-fix-for-disable-des.patch \
            file://0010-net-snmp-Reproducibility-Don-t-check-build-host-for.patch \
            file://0011-ac_add_search_path.m4-keep-consistent-between-32bit-.patch \
-           file://0012-Fix-configuration-of-NETSNMP_FD_MASK_TYPE.patch \
-           file://0001-Android-Fix-the-build.patch \
-          "
-SRC_URI[sha256sum] = "8b4de01391e74e3c7014beb43961a2d6d6fa03acc34280b9585f4930745b0544"
+           file://netsnmp-swinst-crash.patch \
+           "
+SRC_URI[sha256sum] = "07f94f06a8d681485e43eeec4f190d9bea43e1b335146d0de466b6de3f3f4c5a"
 
 UPSTREAM_CHECK_URI = "https://sourceforge.net/projects/net-snmp/files/net-snmp/"
 UPSTREAM_CHECK_REGEX = "/net-snmp/(?P<pver>\d+(\.\d+)+)/"
+
+CVE_PRODUCT = "net-snmp:net-snmp"
 
 inherit autotools-brokensep update-rc.d siteinfo systemd pkgconfig perlnative ptest multilib_script multilib_header
 
@@ -41,8 +40,6 @@ EXTRA_OEMAKE = "INSTALL_PREFIX=${D} OTHERLDFLAGS='${LDFLAGS}' HOST_CPPFLAGS='${B
 PARALLEL_MAKE = ""
 CCACHE = ""
 CLEANBROKEN = "1"
-
-TARGET_CC_ARCH += "${LDFLAGS}"
 
 PACKAGECONFIG ??= "${@bb.utils.filter('DISTRO_FEATURES', 'ipv6 systemd', d)} des smux"
 PACKAGECONFIG[des] = "--enable-des, --disable-des"
@@ -53,6 +50,8 @@ PACKAGECONFIG[perl] = "--enable-embedded-perl --with-perl-modules=yes, --disable
 PACKAGECONFIG[smux] = ""
 PACKAGECONFIG[systemd] = "--with-systemd, --without-systemd"
 
+SYSCONTACT_DISTRO ?= "no-contact-set@example.com"
+
 EXTRA_OECONF = " \
     --enable-shared \
     --disable-manuals \
@@ -61,6 +60,7 @@ EXTRA_OECONF = " \
     --with-persistent-directory=${localstatedir}/lib/net-snmp \
     --with-endianness=${@oe.utils.conditional('SITEINFO_ENDIANNESS', 'le', 'little', 'big', d)} \
     --with-mib-modules='${MIB_MODULES}' \
+    --with-sys-contact='${SYSCONTACT_DISTRO}' \
 "
 
 MIB_MODULES = ""
@@ -73,6 +73,7 @@ CACHED_CONFIGUREVARS = " \
     lt_cv_shlibpath_overrides_runpath=yes \
     ac_cv_path_UNAMEPROG=${base_bindir}/uname \
     ac_cv_path_PSPROG=${base_bindir}/ps \
+    ac_cv_ps_flags="-e" \
     ac_cv_file__etc_printcap=no \
     NETSNMP_CONFIGURE_OPTIONS= \
 "
@@ -111,6 +112,10 @@ do_configure:append() {
         -e "s@^NSC_LIBDIR=-L.*@NSC_LIBDIR=-L${STAGING_DIR_TARGET}\$\{libdir\}@g" \
         -e "s@^NSC_LDFLAGS=\"-L.* @NSC_LDFLAGS=\"-L${STAGING_DIR_TARGET}\$\{libdir\} @g" \
         -i ${B}/net-snmp-config
+
+    # Make libtool inject -Wl,--as-needed so that it is specified before any lib
+    # dependencies. This is needed due to libtools' reordering of the arguments.
+    [ -z "${ASNEEDED}" ] || sed -e "s@CC -shared@\0 ${ASNEEDED}@" -i ${B}/libtool
 }
 
 do_install:append() {
@@ -243,7 +248,6 @@ FILES:${PN}-dbg += "${libdir}/.debug/ ${sbindir}/.debug/ ${bindir}/.debug/"
 FILES:${PN}-dev += "${bindir}/mib2c \
                     ${bindir}/mib2c-update \
                     ${bindir}/net-snmp-config \
-                    ${bindir}/net-snmp-create-v3-user \
 "
 
 CONFFILES:${PN}-server-snmpd = "${sysconfdir}/snmp/snmpd.conf"
@@ -265,14 +269,18 @@ RDEPENDS:${PN}-server-snmpd += "net-snmp-mibs"
 RDEPENDS:${PN}-server-snmptrapd += "net-snmp-server-snmpd ${PN}-lib-trapd"
 RDEPENDS:${PN}-server += "net-snmp-server-snmpd net-snmp-server-snmptrapd"
 RDEPENDS:${PN}-client += "net-snmp-mibs net-snmp-libs"
-RDEPENDS:${PN}-libs += "libpci \
-                        ${PN}-lib-netsnmp \
+RDEPENDS:${PN}-libs += "${PN}-lib-netsnmp \
                         ${PN}-lib-agent \
                         ${PN}-lib-helpers \
                         ${PN}-lib-mibs \
 "
-RDEPENDS:${PN}-ptest += "perl \
+RDEPENDS:${PN}-libs:append:class-target = " libpci"
+RDEPENDS:${PN}-ptest += "${PN}-server-snmpd \
+                         ${PN}-server-snmptrapd \
+                         net-tools \
+                         perl \
                          perl-module-test \
+                         perl-module-socket \
                          perl-module-file-basename \
                          perl-module-getopt-long \
                          perl-module-file-temp \
