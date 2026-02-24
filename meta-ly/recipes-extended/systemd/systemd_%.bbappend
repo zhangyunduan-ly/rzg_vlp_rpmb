@@ -6,6 +6,8 @@ SRC_URI:append = "file://10-eth0.network \
 				  file://70-persistent-net.rules \
 				  file://80-mobile-tty-usb.rules"
 
+PACKAGECONFIG:remove = "timesyncd"
+
 do_install:append() {
 	install -d ${D}${sysconfdir}/systemd/network/
 	install -m 0644 ${WORKDIR}/10-eth0.network ${D}${sysconfdir}/systemd/network/
