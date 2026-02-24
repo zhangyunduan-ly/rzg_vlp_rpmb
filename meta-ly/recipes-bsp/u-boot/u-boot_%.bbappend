@@ -1,3 +1,3 @@
 UBOOT_URI = "git://github.com/zhangyunduan-ly/renesas-u-boot-cip-ly.git;protocol=https"
-UBOOT_BRANCH = "dev-ly-plat"
-UBOOT_REV = "862886f564a1703a6cea18c6a9495929f86dc342"
+UBOOT_BRANCH = "dev-ly-ap"
+UBOOT_REV = "ccc1f5a98614b3bd5f1b2eabe0fd18e3f5ad035c"
