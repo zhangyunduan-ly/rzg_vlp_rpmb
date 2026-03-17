@@ -1,1 +1,1 @@
-PACKAGECONFIG::append = "eap-mschapv2"
+PACKAGECONFIG:append = " eap-mschapv2"
