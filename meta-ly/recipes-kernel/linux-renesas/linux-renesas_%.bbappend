@@ -1,4 +1,4 @@
 KERNEL_URL = "git://github.com/zhangyunduan-ly/rz_linux-cip-ly.git"
 
 KERNEL_BRANCH = "dev-ly-mod-us"
-KERNEL_REV = "fbdae901f4e175dc79190c52069d43b7a0260895"
+KERNEL_REV = "0e79757297ea794d346b7c5a040fe0b0f644e0f9"
