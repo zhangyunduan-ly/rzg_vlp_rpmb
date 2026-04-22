@@ -188,10 +188,6 @@ function app_monitor()
 			fi
 
 			rm -rf /data/mainapp/firmware/upgrade/*
-
-			echo "System will reboot now..."
-			sleep 2
-			systemctl reboot
 		fi
 	fi
 }
@@ -350,10 +346,11 @@ echo "system monitor will running !!!"
 
 rtl8821cs_loglevel_set
 
+app_monitor
+
 while true
 do
 	usb_monitor
-	app_monitor
 	cpu_freq_monitor
 	disk_monitor
 	sleep 1
