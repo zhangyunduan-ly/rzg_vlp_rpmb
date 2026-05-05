@@ -1,0 +1,303 @@
+#!/bin/sh
+
+#*******************************************************************************
+# Function Name: func_sta_connect
+# Description  : Connect to Wi-Fi in station mode
+# Arguments    : ssid [psk]
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_sta_connect()
+{
+    local param_num=$#
+    local sec_mod=0
+
+    local ssid=$1
+    if [ -z "$ssid" ]; then
+        echo "SSID cannot be empty"
+        return 1
+    fi
+
+    if [ $param_num -gt 1 ]; then
+        local psk=$2
+        sec_mod=1
+        if [ ${#psk} -lt 8 ]; then
+            echo "PSK must be at least 8 characters long"
+            return 1
+        fi
+    fi
+
+    if [ $sec_mod -eq 0 ]; then
+        sed -i '6s/.*/'network={'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '7s/.*/'\ \ sid=\"$ssid\"'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '8s/.*/'\ \ key_mgmt=NONE'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '9s/.*/'\ \ bgscan=\"simple:15:-45:20\"'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '10s/.*/'\ \ priority=1'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '11s/.*/'}'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+
+        sed -i '14s/.*/'#network={'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '15s/.*/'#\ \ ssid=\"$ssid\"'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '16s/.*/'#\ \ pairwise=CCMP\ TKIP'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '17s/.*/'#\ \ group=CCMP\ TKIP'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '18s/.*/'#\ \ key_mgmt=WPA-PSK'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '19s/.*/'#\ \ psk=\"$psk\"'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '20s/.*/'#\ \ proto=WPA2\ WPA'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '21s/.*/'#}'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+    else
+        sed -i '6s/.*/'#network={'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '7s/.*/'#\ \ sid=\"$ssid\"'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '8s/.*/'#\ \ key_mgmt=NONE'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '9s/.*/'#\ \ bgscan=\"simple:15:-45:20\"'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '10s/.*/'#\ \ priority=1'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '11s/.*/'#}'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+
+        sed -i '14s/.*/'network={'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '15s/.*/'\ \ ssid=\"$ssid\"'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '16s/.*/'\ \ pairwise=CCMP\ TKIP'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '17s/.*/'\ \ group=CCMP\ TKIP'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '18s/.*/'\ \ key_mgmt=WPA-PSK'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '19s/.*/'\ \ psk=\"$psk\"'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '20s/.*/'\ \ proto=WPA2\ WPA'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+        sed -i '21s/.*/'}'/' /etc/wpa_supplicant/wpa_supplicant-nl80211-wlan0.conf
+    fi
+
+    if systemctl is-active --quiet hostapd; then
+        systemctl stop hostapd
+        was_hostapd_active=true
+    fi
+
+    systemctl restart wpa_supplicant-nl80211@wlan0
+    sleep 2
+    udhcpc -i wlan0 -n -q 
+
+    if ! iw dev | grep -q "Interface wlan1"; then
+        iw dev wlan0 interface add wlan1 type __ap
+    fi
+
+    if iw dev wlan0 link | grep -q "Connected"; then
+        st=`wpa_cli -i wlan0 status | grep freq`
+        freq=${st:5:4}
+        x=$(($freq-2412))
+        channel=$(($x/5+1))
+        sed -i '9s/.*/'channel="$channel"'/' /etc/hostapd.conf
+    fi
+
+    if [ "$was_hostapd_active" = true ]; then
+        systemctl start hostapd
+    fi
+
+    return 0
+}
+
+#*******************************************************************************
+# Function Name: func_sta_disconnect
+# Description  : Disconnect from Wi-Fi in station mode
+# Arguments    : none
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_sta_disconnect()
+{
+    systemctl stop wpa_supplicant-nl80211@wlan0
+    return 0
+}
+
+#*******************************************************************************
+# Function Name: func_sta_status
+# Description  : Show Wi-Fi connection status in station mode
+# Arguments    : none
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_sta_status()
+{
+    if iw dev wlan0 link | grep -q "Connected"; then
+        echo "Connected to Wi-Fi"
+        return 0
+    else
+        echo "Not connected to Wi-Fi"
+        return 1
+    fi
+}
+
+#*******************************************************************************
+# Function Name: func_sta_scan
+# Description  : Scan Wi-Fi access point in station mode
+# Arguments    : none
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_sta_scan()
+{
+    if ! iw dev | grep -q "Interface wlan1"; then
+        iw dev wlan0 interface add wlan1 type __ap
+    fi
+
+    if ! ip link show wlan0 | grep -q "UP"; then
+        ip link set wlan0 up
+    fi
+
+    iw dev wlan0 scan > /tmp/wifi_scan_result.txt
+
+    echo "Wi-Fi Scan Results:"
+    cat /tmp/wifi_scan_result.txt | grep SSID
+
+    return 0
+}
+
+#*******************************************************************************
+# Function Name: func_sta_cmd
+# Description  : Handle station mode commands
+# Arguments    : cmd [args...]
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_sta_cmd()
+{
+    local cmd=$1
+    case "$cmd" in
+        connect)
+            shift
+            func_sta_connect $@
+            ;;
+        disconnect)
+            func_sta_disconnect
+            ;;
+        status)
+            func_sta_status
+            ;;
+        scan)
+            func_sta_scan
+            ;;
+        *)
+            echo "Unknown command: $cmd"
+            return 1
+            ;;
+    esac
+}
+
+#*******************************************************************************
+# Function Name: func_ap_open
+# Description  : Start Wi-Fi in access point mode
+# Arguments    : ssid pass
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_ap_open()
+{
+    local ssid=$1
+    local pass=$2
+    local channel=1
+
+    if [ -z "$ssid" ]; then
+        echo "SSID cannot be empty"
+        return 1
+    fi
+    if [ ${#pass} -lt 8 ]; then
+        echo "Password must be at least 8 characters long"
+        return 1
+    fi
+
+    if ! iw dev | grep -q "Interface wlan1"; then
+        iw dev wlan0 interface add wlan1 type __ap
+    fi
+
+    if iw dev wlan0 link | grep -q "Connected"; then
+        st=`wpa_cli -i wlan0 status | grep freq`
+        freq=${st:5:4}
+        x=$(($freq-2412))
+        channel=$(($x/5+1))
+    fi
+
+    sed -i '6s/.*/'ssid="$ssid"'/' /etc/hostapd.conf
+    sed -i '9s/.*/'channel="$channel"'/' /etc/hostapd.conf
+    sed -i '17s/.*/'wpa_passphrase="$pass"'/' /etc/hostapd.conf
+
+    systemctl restart hostapd
+    return 0
+}
+
+#*******************************************************************************
+# Function Name: func_ap_close
+# Description  : Stop Wi-Fi in access point mode
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_ap_close()
+{
+    systemctl stop hostapd
+    return 0
+}
+
+#*******************************************************************************
+# Function Name: func_ap_status
+# Description  : Show Wi-Fi access point status
+# Arguments    : none
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_ap_status()
+{
+    if systemctl is-active --quiet hostapd; then
+        echo "Wi-Fi Access Point is active"
+        return 0
+    else
+        echo "Wi-Fi Access Point is not active"
+        return 1
+    fi
+}
+
+#*******************************************************************************
+# Function Name: func_ap_cmd
+# Description  : Handle access point mode commands
+# Arguments    : cmd [args...]
+# Return Value : 0 or 1
+#*******************************************************************************
+function func_ap_cmd()
+{
+    local cmd=$1
+    case "$cmd" in
+        open)
+            shift
+            func_ap_open $@
+            ;;
+        close)
+            func_ap_close
+            ;;
+        status)
+            func_ap_status
+            ;;
+        *)
+            echo "Unknown command: $cmd"
+            return 1
+            ;;
+    esac
+}
+
+#*******************************************************************************
+# Function Name: func_usage_exit
+# Description  : Print usage and exit
+# Arguments    : none
+# Return Value : none (exit)
+#*******************************************************************************
+function func_usage_exit()
+{
+    echo "Usage: $0 [sta|ap] [args...]"
+    echo "  sta connect <ssid> [psk]   - Connect to Wi-Fi in station mode"
+    echo "  sta disconnect             - Disconnect from Wi-Fi in station mode"
+    echo "  sta status                 - Show Wi-Fi connection status in station mode"
+    echo "  sta scan                   - Scan Wi-Fi access point in station mode"
+    echo "  ap open <ssid> <pass>      - Start Wi-Fi in access point mode"
+    echo "  ap close                   - Stop Wi-Fi in access point mode"
+    echo "  ap status                  - Show Wi-Fi access point status"
+    exit 1
+}
+
+CMD=$1
+case "$CMD" in
+    sta)
+        shift
+        func_sta_cmd $@
+        ;;
+    ap)
+        shift
+        func_ap_cmd $@
+        ;;
+    *)
+        func_usage_exit
+        ;;
+esac
+
+exit $?
