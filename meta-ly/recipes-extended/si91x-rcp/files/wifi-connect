@@ -184,10 +184,9 @@ function func_ap_open()
     local channel=1
 
     if [ -z "$ssid" ]; then
-        echo "SSID cannot be empty"
-        return 1
+        echo "SSID not provided, keep current value"
     fi
-    if [ ${#pass} -lt 8 ]; then
+    if [ -n "$pass" ] && [ ${#pass} -lt 8 ]; then
         echo "Password must be at least 8 characters long"
         return 1
     fi
@@ -203,9 +202,15 @@ function func_ap_open()
         channel=$(($x/5+1))
     fi
 
-    sed -i '6s/.*/'ssid="$ssid"'/' /etc/hostapd.conf
+    if [ -n "$ssid" ]; then
+        sed -i '6s/.*/'ssid="$ssid"'/' /etc/hostapd.conf
+    fi
+
     sed -i '9s/.*/'channel="$channel"'/' /etc/hostapd.conf
-    sed -i '17s/.*/'wpa_passphrase="$pass"'/' /etc/hostapd.conf
+
+    if [ -n "$pass" ]; then
+        sed -i '17s/.*/'wpa_passphrase="$pass"'/' /etc/hostapd.conf
+    fi
 
     systemctl restart hostapd
     return 0
@@ -279,7 +284,7 @@ function func_usage_exit()
     echo "  sta disconnect             - Disconnect from Wi-Fi in station mode"
     echo "  sta status                 - Show Wi-Fi connection status in station mode"
     echo "  sta scan                   - Scan Wi-Fi access point in station mode"
-    echo "  ap open <ssid> <pass>      - Start Wi-Fi in access point mode"
+    echo "  ap open [ssid] [pass]      - Start Wi-Fi in access point mode"
     echo "  ap close                   - Stop Wi-Fi in access point mode"
     echo "  ap status                  - Show Wi-Fi access point status"
     exit 1
