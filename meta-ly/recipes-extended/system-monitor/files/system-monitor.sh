@@ -165,15 +165,85 @@ function usb_monitor()
 
 #监控是否需要升级
 INSTALLFILE_EXIT_CODE=0
-UPGRADELOG="/home/root/upgrade.log"
-UPGRADETEMPLOG="/home/root/upgrade_temp.log"
+UPGRADELOG="$HOME/upgrade.log"
+UPGRADETEMPLOG="$HOME/upgrade_temp.log"
+function update_app()
+{
+	for file in /data/mainapp/firmware/upgrade/*.rpm; do
+		[ -f "$file" ] || continue
+
+		rpm_name=$(rpm -qp --queryformat '%{NAME}' "$file" 2>/dev/null)
+
+		if [ -n "$rpm_name" ]; then
+			find /data/mainapp/firmware/ \
+				-maxdepth 1 \
+				-type f \
+				-name "${rpm_name}-*.rpm" \
+				-exec rm -f {} \;
+		fi
+
+		cp -f "$file" /data/mainapp/firmware/
+	done
+}
+
+check_app_integrity()
+{
+    local pkg_name="$1"
+
+    if [ -z "$pkg_name" ]; then
+        echo "pkg_name is empty"
+        return 1
+    fi
+
+    rpm -V -- "$pkg_name" 2>/dev/null | \
+    awk '
+    {
+        sub(/^[ \t]+/, "", $0)
+
+        if ($1 == "missing") {
+            print
+            exit 1
+        }
+
+        if (substr($1, 3, 1) == "5") {
+            print
+            exit 1
+        }
+    }'
+
+    if [ $? -eq 0 ]; then
+		echo "$(date '+%Y-%m-%d %H:%M:%S') ${pkg_name} integrity check success"
+        return 0
+    fi
+
+    echo "$(date '+%Y-%m-%d %H:%M:%S') ${pkg_name} integrity check failed"
+
+    RPM_FILE=$(ls -t /data/mainapp/firmware/${pkg_name}-*.rpm 2>/dev/null | head -n 1)
+
+    if [ ! -f "$RPM_FILE" ]; then
+        echo "${pkg_name} rpm not found"
+        return 1
+    fi
+
+    echo "reinstall ${pkg_name} from $RPM_FILE"
+
+	rpm -e ${pkg_name}
+    rpm -Uvh --force "$RPM_FILE"
+
+    return $?
+}
+
 function app_monitor()
 {
+	check_app_integrity hal
+	check_app_integrity platform
+	check_app_integrity mainapp
+
 	if [ -f $DCUAPPFILE ]; then
 		echo "find dcuapp file: $DCUAPPFILE"
 		sleep 5
 
-		tar -zxvf "$DCUAPPFILE" -C "$upgradePath"
+		tar -zxvf "$DCUAPPFILE" -C "$upgradePath"  
 
 		if [ -f $INSTALLFILE ]; then
 			chmod +x $INSTALLFILE
@@ -181,20 +251,22 @@ function app_monitor()
 			INSTALLFILE_EXIT_CODE=$?
 
 			echo "upgrade result $INSTALLFILE_EXIT_CODE"
-			if [ $INSTALLFILE_EXIT_CODE -eq 0 ]; then
+			if [ $INSTALLFILE_EXIT_CODE -ne 0 ]; then
 				currenttime=`date "+%Y-%m-%d %H:%M:%S"`
 				echo "$currenttime $DCUAPPFILE upgrade fail" >> $UPGRADELOG
 				tail -n 10 $UPGRADELOG > $UPGRADETEMPLOG && mv $UPGRADETEMPLOG $UPGRADELOG
 			fi
+			
+			update_app
 
 			rm -rf /data/mainapp/firmware/upgrade/*
 		fi
 	fi
 }
 
-SYSTEMDIR="/home/root/"
+SYSTEMDIR="$HOME"
 DISKTESTFILE="/data/disk_testfile"
-SYSTEMERRORFILE=$SYSTEMDIR"fileSystemError"
+SYSTEMERRORFILE=$SYSTEMDIR/"fileSystemError"
 disk_count=0
 
 function disk_monitor()
@@ -214,7 +286,7 @@ function disk_monitor()
 	# 尝试创建测试文件
 	if ! touch "$DISKTESTFILE" 2>/dev/null; then
 		# 创建失败，说明文件系统异常，创建异常标记文件
-		filename=$SYSTEMDIR"fs.log"
+		filename=$SYSTEMDIR/"fs.log"
 		filesize=0
 		maxsize=$((1024*256))
 		totalcount=0
@@ -254,7 +326,7 @@ function disk_monitor()
 
 		#format data paration
 		if [ $dataformat -gt 0 ];then
-			systemctl stop boa
+			systemctl stop webgui
 			systemctl stop mainapp #stop mainapp service
 			docker stop $(docker ps -aq) #stop all docker container
 
@@ -342,11 +414,23 @@ function rtl8821cs_loglevel_set()
 	fi
 }
 
+# mainapp service
+function mainapp_service()
+{
+	if systemctl is-active --quiet mainapp; then
+		echo "mainapp is running"
+	else
+		echo "start mainapp"
+		systemctl start mainapp
+	fi
+}
+
 echo "system monitor will running !!!"
 
 rtl8821cs_loglevel_set
 
 app_monitor
+mainapp_service
 
 while true
 do

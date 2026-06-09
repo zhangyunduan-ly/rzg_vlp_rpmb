@@ -2,7 +2,7 @@ SUMMARY = "bitbake-layers recipe"
 DESCRIPTION = "Recipe created by bitbake-layers"
 LICENSE = "CLOSED"
 
-PV = "0.0.2"
+PV = "0.0.3"
 
 SRC_URI = "file://system-monitor.service \
            file://system-monitor.sh"
