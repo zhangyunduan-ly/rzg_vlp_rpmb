@@ -1,13 +1,12 @@
-From 18d04b104b8d95c486f26d272e12ff64e90335fd Mon Sep 17 00:00:00 2001
+From deaea1b3234973fd7f70863bcd03072516ce02b3 Mon Sep 17 00:00:00 2001
 From: zhangyunduan <zhangyunduan@linyang.com.cn>
-Date: Tue, 31 Mar 2026 10:22:05 +0800
-Subject: [PATCH] optee-os: add linyang ecc rpmb ta interface
+Date: Fri, 26 Jun 2026 11:16:26 +0800
+Subject: [PATCH 1/2] optee-os: add linyang ecc rpmb ta interface
 
 ---
- mk/config.mk                                |    6 +-
  ta/ly_ecc/Android.mk                        |    4 +
  ta/ly_ecc/Makefile                          |   12 +
- ta/ly_ecc/SERVp_ecc/SERVp_ecc.c             |  296 +++
+ ta/ly_ecc/SERVp_ecc/SERVp_ecc.c             |  346 +++
  ta/ly_ecc/SERVp_ecc/_ecc.c                  | 2109 +++++++++++++++++++
  ta/ly_ecc/SERVp_ecc/ecc.c                   |  833 ++++++++
  ta/ly_ecc/SERVp_ecc/ecc_curves32.c          |  625 ++++++
@@ -21,7 +20,7 @@ Subject: [PATCH] optee-os: add linyang ecc rpmb ta interface
  ta/ly_ecc/SERVp_hash/sub.mk                 |    4 +
  ta/ly_ecc/include/SERVp_cycurlib_config.h   |  190 ++
  ta/ly_ecc/include/SERVp_cycurlib_error.h    |  246 +++
- ta/ly_ecc/include/SERVp_ecc.h               |   18 +
+ ta/ly_ecc/include/SERVp_ecc.h               |   19 +
  ta/ly_ecc/include/SERVp_hash.h              |   10 +
  ta/ly_ecc/include/SERVp_hash_MD5.h          |   35 +
  ta/ly_ecc/include/SERVp_hash_Sha1.h         |   52 +
@@ -39,19 +38,19 @@ Subject: [PATCH] optee-os: add linyang ecc rpmb ta interface
  ta/ly_ecc/include/r_sce_api.h               | 1488 +++++++++++++
  ta/ly_ecc/include/tee_time.h                |   21 +
  ta/ly_ecc/include/user_ta_header_defines.h  |   48 +
- ta/ly_ecc/include/uta_sce_ecc.h             |   52 +
+ ta/ly_ecc/include/uta_sce_ecc.h             |   54 +
  ta/ly_ecc/sub.mk                            |    4 +
  ta/ly_ecc/user_ta.mk                        |    1 +
- ta/ly_ecc/uta_sce_ecc.c                     |  910 ++++++++
+ ta/ly_ecc/uta_sce_ecc.c                     | 1029 +++++++++
  ta/ly_rpmb/Android.mk                       |    4 +
  ta/ly_rpmb/Makefile                         |   12 +
  ta/ly_rpmb/include/r_sce_api.h              | 1488 +++++++++++++
- ta/ly_rpmb/include/secure_storage_ta.h      |  124 ++
+ ta/ly_rpmb/include/secure_storage_ta.h      |  147 ++
  ta/ly_rpmb/include/user_ta_header_defines.h |   48 +
- ta/ly_rpmb/secure_storage_ta.c              | 1048 +++++++++
+ ta/ly_rpmb/secure_storage_ta.c              | 1362 ++++++++++++
  ta/ly_rpmb/sub.mk                           |    2 +
  ta/ly_rpmb/user_ta.mk                       |    1 +
- 47 files changed, 14654 insertions(+), 3 deletions(-)
+ 46 files changed, 15160 insertions(+)
  create mode 100644 ta/ly_ecc/Android.mk
  create mode 100644 ta/ly_ecc/Makefile
  create mode 100644 ta/ly_ecc/SERVp_ecc/SERVp_ecc.c
@@ -99,35 +98,6 @@ Subject: [PATCH] optee-os: add linyang ecc rpmb ta interface
  create mode 100644 ta/ly_rpmb/sub.mk
  create mode 100644 ta/ly_rpmb/user_ta.mk
 
-diff --git a/mk/config.mk b/mk/config.mk
-index 3ac1bfb2..9ece3491 100644
---- a/mk/config.mk
-+++ b/mk/config.mk
-@@ -67,13 +67,13 @@ CFG_TEE_CORE_DEBUG ?= y
- # 2: error + info
- # 3: error + info + debug
- # 4: error + info + debug + flow
--CFG_TEE_CORE_LOG_LEVEL ?= 2
-+CFG_TEE_CORE_LOG_LEVEL ?= 3
- 
- # TA log level
- # If user-mode library libutils.a is built with CFG_TEE_TA_LOG_LEVEL=0,
- # TA tracing is disabled regardless of the value of CFG_TEE_TA_LOG_LEVEL
- # when the TA is built.
--CFG_TEE_TA_LOG_LEVEL ?= 1
-+CFG_TEE_TA_LOG_LEVEL ?= 3
- 
- # TA enablement
- # When defined to "y", TA traces are output according to
-@@ -287,7 +287,7 @@ CFG_WITH_USER_TA ?= y
- # When this flag is enabled, the ELF loader will introduce a random offset
- # when mapping the application in user space. ASLR makes the exploitation of
- # memory corruption vulnerabilities more difficult.
--CFG_TA_ASLR ?= y
-+CFG_TA_ASLR ?= n
- 
- # How much ASLR may shift the base address (in pages). The base address is
- # randomly shifted by an integer number of pages comprised between these two
 diff --git a/ta/ly_ecc/Android.mk b/ta/ly_ecc/Android.mk
 new file mode 100644
 index 00000000..7078c4dd
@@ -158,10 +128,10 @@ index 00000000..3e042c43
 +endif
 diff --git a/ta/ly_ecc/SERVp_ecc/SERVp_ecc.c b/ta/ly_ecc/SERVp_ecc/SERVp_ecc.c
 new file mode 100644
-index 00000000..8c3468a2
+index 00000000..b5434fd4
 --- /dev/null
 +++ b/ta/ly_ecc/SERVp_ecc/SERVp_ecc.c
-@@ -0,0 +1,296 @@
+@@ -0,0 +1,346 @@
 +
 +#include "SERVp_hash.h"
 +#include "SERVp_ecc.h"
@@ -269,6 +239,56 @@ index 00000000..8c3468a2
 +#else
 +    SERVp_hash_sha512(pBuf, inLen, ShaValue, 1, NULL); //1:is384
 +#endif //CFGSHA384_hardWareEnable
++  }
++
++#ifdef CFGECC_hardWareEnable
++  return FALSE; //暂不支持硬件ECC，后续添加
++#else
++  EscEcc_SignatureT nEscEccSignature;
++  EscEcc_PublicKeyT nEscEccQ;
++  DMSG("%s %d \r\n",__func__, __LINE__);
++  memcpy(nEscEccSignature.r_bytes, pSig, nPriveKeyLen);
++  memcpy(nEscEccSignature.s_bytes, pSig + nPriveKeyLen, nPriveKeyLen);
++  memcpy(nEscEccQ.x, pQDig, nPriveKeyLen);
++  memcpy(nEscEccQ.y, pQDig + nPriveKeyLen, nPriveKeyLen);
++  DMSG("%s %d  %d\r\n", __func__, __LINE__, curveId);
++  DMSG("\r\nVerify HASH value is: ");
++    for(int i=0;i<nPriveKeyLen;i++)
++    {
++        DMSG("%x",ShaValue[i]);
++    }
++  if (Esc_NO_ERROR == EscEcc_SignatureVerification(ShaValue, nPriveKeyLen, &nEscEccSignature, &nEscEccQ, curveId)) {
++    DMSG("%s %d \r\n",__func__, __LINE__);
++    return TRUE;
++  } else {
++    DMSG("%s %d \r\n",__func__, __LINE__);
++    return FALSE;
++  }
++#endif //CFGECC_hardWareEnable
++}
++
++/*****************************************************************************
++ 函 数 名  : Servp_ECDSA_Verification
++ 功能描述  : 数字签名验证 对数据先做SHA再做签名验证
++ 输入参数  : INT8U *pQDig  签名验证的公钥 
++ 		   : INT8U nPriveKeyLen 签名私钥的长度 32 or 48 byte
++ 		     INT8U* pBuf  等待签名验证的数据   
++ 		     int inLen 等待签名验证的数据长度
++ 		     INT8U *pSig  等待验证的签名
++  		   : B_FUN_V ECCquitCondition  回调函数指针，用于查看是否需要紧急情况下及时退出，需要调用者根据实际情况编写函数。
++ 输出参数  : 
++ 返 回 值  : BOOL TRUE 签名验证成功
++*****************************************************************************/
++//BOOL Servp_ECDSA_Verification(INT8U *pQDig, INT8U nPriveKeyLen, INT8U *pBuf, int inLen, INT8U *pSig, B_FUN_V ECCquitCondition)
++BOOL Servp_ECDSA_Verification_for_DCU_upgrade(INT8U *pQDig, INT8U nPriveKeyLen, INT8U *ShaValue, int inLen, INT8U *pSig)
++{
++  EscEcc_CurveId curveId = EscEcc_CURVE_SECP_256;
++  if (ECC256_PRIKEY_LEN == nPriveKeyLen) {
++    DMSG("%s %d \r\n",__func__, __LINE__);
++    curveId = EscEcc_CURVE_SECP_256;
++  } else {
++    DMSG("%s %d \r\n",__func__, __LINE__);
++    curveId = EscEcc_CURVE_SECP_384; //CFGSHA384_hardWareEnable
 +  }
 +
 +#ifdef CFGECC_hardWareEnable
@@ -6823,10 +6843,10 @@ index 00000000..fa6521ff
 +#endif
 diff --git a/ta/ly_ecc/include/SERVp_ecc.h b/ta/ly_ecc/include/SERVp_ecc.h
 new file mode 100644
-index 00000000..2eecc27c
+index 00000000..79f80323
 --- /dev/null
 +++ b/ta/ly_ecc/include/SERVp_ecc.h
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,19 @@
 +#ifndef	SERVP_ECC_H_
 +#define	SERVP_ECC_H_
 +
@@ -6843,6 +6863,7 @@ index 00000000..2eecc27c
 +extern BOOL Servp_ECC_PubKey_verification(INT8U *pPubkey, INT8U nPriveKeyLen);
 +BOOL Servp_ECC_CheckKeyPair(INT8U *pPriveKey, INT8U *pPubKey,INT8U nPriveKeyLen);
 +extern BOOL Servp_ECDH(INT8U *pPriKey, INT8U *pPubKey,INT8U *SharedSecret,INT8U nPriveKeyLen);
++extern BOOL Servp_ECDSA_Verification_for_DCU_upgrade(INT8U *pQDig, INT8U nPriveKeyLen, INT8U *ShaValue, int inLen, INT8U *pSig);
 +
 +#endif //SERVP_ECC_H_
 diff --git a/ta/ly_ecc/include/SERVp_hash.h b/ta/ly_ecc/include/SERVp_hash.h
@@ -11294,10 +11315,10 @@ index 00000000..51b65a84
 +#endif /*USER_TA_HEADER_DEFINES_H*/
 diff --git a/ta/ly_ecc/include/uta_sce_ecc.h b/ta/ly_ecc/include/uta_sce_ecc.h
 new file mode 100644
-index 00000000..7479b872
+index 00000000..bec53331
 --- /dev/null
 +++ b/ta/ly_ecc/include/uta_sce_ecc.h
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,54 @@
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +/*
 + * Copyright (c) 2022, Renesas Electronics Corporation
@@ -11349,6 +11370,8 @@ index 00000000..7479b872
 +#define PTA_CMD_ECC_secp256r1_ECDH       (0x00056000)
 +#define PTA_CMD_ECC_secp384r1_ECDH       (0x00056010)
 +
++#define PTA_CMD_ECC_secp256r1_SinVerify_for_uprade (0x00057000)
++
 +#endif /* __PTA_SCE_ECC_H */
 diff --git a/ta/ly_ecc/sub.mk b/ta/ly_ecc/sub.mk
 new file mode 100644
@@ -11371,10 +11394,10 @@ index 00000000..4a334c02
 \ No newline at end of file
 diff --git a/ta/ly_ecc/uta_sce_ecc.c b/ta/ly_ecc/uta_sce_ecc.c
 new file mode 100644
-index 00000000..5e739551
+index 00000000..cd1c396e
 --- /dev/null
 +++ b/ta/ly_ecc/uta_sce_ecc.c
-@@ -0,0 +1,910 @@
+@@ -0,0 +1,1029 @@
 +/*
 + * Copyright (c) 2017, Linaro Limited
 + * All rights reserved.
@@ -12247,6 +12270,121 @@ index 00000000..5e739551
 +    return TEE_SUCCESS;
 +}
 +
++static TEE_Result ecdsa_sec_verify_for_dcu_upgrade(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
++{
++    // 重新定义4参数分配（适配上层明文公钥传递）：
++    // params[0]：输入，明文公钥（x+y分量，长度=2*私钥长度）
++    // params[1]：输入，待验证数据+签名的组合结构（格式：[4字节数据长度][待验数据][签名]）
++    // params[2]：预留
++    // params[3]：输出，验证结果（1=成功，0=失败，1字节）
++
++    // 提取输入参数
++    uint8_t *plain_pub_key = (uint8_t *)params[0].memref.buffer;   // 明文公钥
++    uint32_t plain_pub_len = params[0].memref.size;                // 明文公钥长度
++    uint8_t *combined_data = (uint8_t *)params[1].memref.buffer;   // 组合数据（待验数据+签名）
++    uint32_t combined_size = params[1].memref.size;                // 组合数据总长度
++    uint8_t *verify_result = (uint8_t *)params[3].memref.buffer;   // 验证结果输出
++    uint32_t result_buf_size = params[3].memref.size;              // 结果缓冲区大小
++
++    // 内部变量
++    BOOL verify_success = FALSE;
++    uint8_t t_key_len;                  // 私钥长度（=公钥长度/2）
++    TEE_Result tee_res = TEE_SUCCESS;
++    // 组合数据解析后变量
++    uint32_t data_len;                  // 待验证数据长度
++    uint8_t *pBuf;                      // 待验证数据指针
++    uint8_t *pSig;                      // 签名数据指针
++    uint32_t sig_len;                   // 签名长度
++
++
++    // 1. 校验参数类型
++    if (types != TEE_PARAM_TYPES(
++                    TEE_PARAM_TYPE_MEMREF_INPUT,   // params[0]：明文公钥
++                    TEE_PARAM_TYPE_MEMREF_INPUT,   // params[1]：组合数据
++                    TEE_PARAM_TYPE_NONE,            // params[2]：预留
++                    TEE_PARAM_TYPE_MEMREF_OUTPUT)) { // params[3]：验证结果
++        DMSG("\r\n[ECDSA-Verify-TEE] Invalid param types (expected 2 input + 1 output)");
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++
++
++    // 2. 基础参数有效性校验
++    if (!plain_pub_key || !combined_data || !verify_result) {
++        DMSG("\r\n[ECDSA-Verify-TEE] NULL pointer in params (pubkey/combined-data/result)");
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++
++
++    // 3. 解析组合数据
++    if (combined_size < 4) { // 至少需要4字节存储待验数据长度
++        DMSG("\r\n[ECDSA-Verify-TEE] Combined data too short (need >=4 bytes, got %u)", combined_size);
++        *verify_result = 0;
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++    // 提取待验数据长度
++    data_len = *(uint32_t *)combined_data;
++    pBuf = combined_data + 4;                  // 待验数据起始地址
++    pSig = pBuf + data_len;                    // 签名起始地址（数据之后）
++    sig_len = combined_size - 4 - data_len;    // 签名长度
++
++    // 校验组合数据完整性
++    if (4 + data_len + sig_len != combined_size) {
++        DMSG("\r\n[ECDSA-Verify-TEE] Combined data format invalid (size mismatch)");
++        *verify_result = 0;
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++    // 校验待验数据长度有效性
++    if (data_len <= 0 || pBuf >= pSig) {
++        DMSG("\r\n[ECDSA-Verify-TEE] Invalid data length in combined data (%u)", data_len);
++        *verify_result = 0;
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++
++
++    // 4. 校验明文公钥和签名长度
++    // 公钥长度必须是256位（64字节）或384位（96字节）
++    if (plain_pub_len != 2 * ECC256_PRIKEY_LEN && plain_pub_len != 2 * ECC384_PRIKEY_LEN) {
++        DMSG("\r\n[ECDSA-Verify-TEE] Invalid plain pubkey length (%u, need 64/96 bytes)", plain_pub_len);
++        *verify_result = 0;
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++    // 私钥长度 = 公钥长度 / 2
++    t_key_len = plain_pub_len / 2;
++    // 签名长度必须等于公钥长度
++    if (sig_len != plain_pub_len) {
++        DMSG("\r\n[ECDSA-Verify-TEE] Sig len (%u) != pubkey len (%u)", sig_len, plain_pub_len);
++        *verify_result = 0;
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++
++
++    // 5. 校验结果缓冲区大小
++    if (result_buf_size < 1) {
++        DMSG("\r\n[ECDSA-Verify-TEE] Result buf too small (need 1 byte, got %u)", result_buf_size);
++        return TEE_ERROR_SHORT_BUFFER;
++    }
++
++
++    // 6. 直接使用明文公钥执行签名验证
++    DMSG("\r\n[ECDSA-Verify-TEE] Start verification with plain pubkey:");
++    DMSG("\r\n  Pubkey len: %u bytes, Data len: %u bytes, Sig len: %u bytes",
++         plain_pub_len, data_len, sig_len);
++    // 调用核心验签接口
++    verify_success = Servp_ECDSA_Verification_for_DCU_upgrade(plain_pub_key, t_key_len, pBuf, data_len, pSig);
++
++
++    // 7. 设置验证结果（1=成功，0=失败）
++    *verify_result = verify_success ? 1 : 0;
++    params[3].memref.size = 1; // 固定结果长度为1字节
++
++    if (!verify_success) {
++        DMSG("\r\n[ECDSA-Verify-TEE] Verification failed");
++        return TEE_ERROR_SIGNATURE_INVALID;
++    }
++
++    DMSG("\r\n[ECDSA-Verify-TEE] Verification succeeded");
++    return TEE_SUCCESS;
++}
 +TEE_Result TA_InvokeCommandEntryPoint(void __unused *session,
 +				      uint32_t command,
 +				      uint32_t param_types,
@@ -12278,6 +12416,10 @@ index 00000000..5e739551
 +    case PTA_CMD_ECC_secp384r1_ECDH:
 +        DMSG("\r\nReady to do ECDH in TEE-OS");
 +        return ecdh_sec_ecdh(param_types, params);
++    
++    case PTA_CMD_ECC_secp256r1_SinVerify_for_uprade:
++        DMSG("\r\nReady to do ECDH (for DCU Upgrade) in TEE-OS");
++        return ecdsa_sec_verify_for_dcu_upgrade(param_types, params);
 +
 +	default:
 +		EMSG("Command ID 0x%x is not supported", command);
@@ -13809,10 +13951,10 @@ index 00000000..3344954f
 + **********************************************************************************************************************/
 diff --git a/ta/ly_rpmb/include/secure_storage_ta.h b/ta/ly_rpmb/include/secure_storage_ta.h
 new file mode 100644
-index 00000000..c9aba38e
+index 00000000..aa0c2744
 --- /dev/null
 +++ b/ta/ly_rpmb/include/secure_storage_ta.h
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,147 @@
 +/*
 + * Copyright (c) 2017, Linaro Limited
 + * All rights reserved.
@@ -13879,7 +14021,8 @@ index 00000000..c9aba38e
 +#define TA_SECURE_STORAGE_CMD_READ_ONLY   4
 +
 +// 密钥分组/数量（固定）
-+#define KEY_GROUP_COUNT        2   // 组0:Suit0/1, 组1:Suit2
++#define KEY_GROUP_COUNT        1   // 组0:Suit0/1, 组1:Suit2
++
 +#define KEY_PER_GROUP          4   // 0=EK, 1=BK, 2=AK, 3=MK(WRAPPED)
 +#define RPMB_KEY_CACHE_MAX_CNT 1024
 +
@@ -13904,14 +14047,36 @@ index 00000000..c9aba38e
 +#define KEY_PAIR_USED_MTR          ((uint32_t)ECC_USED_MTR & 0xFFFF) 
 +
 +
-+typedef struct {
-+    uint32_t crc32_value;                                  // CRC32 校验值
-+    uint32_t rpmb_key_id;                                  // 绑定的RPMB KEY_ID
-+	uint32_t key_len[KEY_GROUP_COUNT][KEY_PER_GROUP];      // 密钥长度
-+    uint8_t  is_valid;                                     // 缓存有效性标记  0=无效，1=已加载数据
-+    uint8_t  key_data[KEY_GROUP_COUNT][KEY_PER_GROUP][sizeof(sce_aes_wrapped_key_t)]; // 密钥数据   
-+} RPMB_Key_Storage;  
++#define BATCH_METER     100
 +
++#define NORMAL_RPMB_MIN_ID  400
++#define NORMAL_RPMB_MAX_ID  500
++// 全局批量缓存：120组 = 最多1200个表
++#define MAX_BATCH_BLOCKS 120
++
++// 正常普通密钥缓存：10组 × 256字节
++#define NORMAL_CACHE_COUNT    10
++#define NORMAL_CACHE_BLOCK_SZ 256
++
++// typedef struct {
++//     uint32_t crc32_value;                                  // CRC32 校验值
++//     uint32_t rpmb_key_id;                                  // 绑定的RPMB KEY_ID
++// 	uint32_t key_len[KEY_GROUP_COUNT][KEY_PER_GROUP];      // 密钥长度
++//     uint8_t  is_valid;                                     // 缓存有效性标记  0=无效，1=已加载数据
++//     uint8_t  key_data[KEY_GROUP_COUNT][KEY_PER_GROUP][sizeof(sce_aes_wrapped_key_t)]; // 密钥数据 
++//     uint8_t fill_data[180]; // 填充数据
++// } RPMB_Key_Storage;  
++typedef struct {
++    uint32_t crc32_value;                                                        
++    uint32_t rpmb_key_id;                                                        
++    uint32_t key_len[KEY_GROUP_COUNT][KEY_PER_GROUP];                            
++    uint8_t  is_valid;                                                           
++    uint8_t  key_data[KEY_GROUP_COUNT][KEY_PER_GROUP][sizeof(sce_aes_wrapped_key_t)]; 
++} RPMB_Key_Storage;
++
++typedef struct {
++  RPMB_Key_Storage items[10]; // 10个表，正好 5880 字节
++} RPMB_Key_Batch_Block;
 +
 +// KUK0专属存储结构体
 +typedef struct {
@@ -13993,10 +14158,10 @@ index 00000000..2b9bb17d
 +#endif /*USER_TA_HEADER_DEFINES_H*/
 diff --git a/ta/ly_rpmb/secure_storage_ta.c b/ta/ly_rpmb/secure_storage_ta.c
 new file mode 100644
-index 00000000..fffac653
+index 00000000..b621d49a
 --- /dev/null
 +++ b/ta/ly_rpmb/secure_storage_ta.c
-@@ -0,0 +1,1048 @@
+@@ -0,0 +1,1362 @@
 +/*
 + * Copyright (c) 2017, Linaro Limited
 + * All rights reserved.
@@ -14034,6 +14199,7 @@ index 00000000..fffac653
 +__attribute__((aligned(16))) volatile RPMB_Key_Storage g_rpmb_key_cache[RPMB_KEY_CACHE_MAX_CNT] = {0};	//16字节内存对齐  禁止编译器优化  
 +
 +__attribute__((aligned(16))) volatile KUK_RPMB_Storage g_kuk0_cache = {0};
++__attribute__((aligned(16))) volatile KUK_RPMB_Storage g_kuk1_cache = {0};
 +
 +//__attribute__((aligned(16))) volatile ECC_RPMB_Key_Storage g_ecc_key_cache = {0};
 +__attribute__((aligned(16))) volatile ECC_RPMB_Key_Storage g_DCU_ecc_key_used_cache = {0};
@@ -14041,6 +14207,10 @@ index 00000000..fffac653
 +
 +__attribute__((aligned(16))) volatile ECC_RPMB_Key_Storage g_MTR_ecc_key_used_cache = {0};
 +__attribute__((aligned(16))) volatile ECC_RPMB_Key_Storage g_MTR_ecc_key_saved_cache = {0};
++
++__attribute__((aligned(16))) volatile RPMB_Key_Batch_Block g_rpmb_batch_cache[MAX_BATCH_BLOCKS] = {0};
++
++__attribute__((aligned(16))) uint8_t g_normal_rpmb_cache[NORMAL_CACHE_COUNT][NORMAL_CACHE_BLOCK_SZ] = {0};
 +
 +static const uint32_t crc32_table[256] = {
 +    0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F,
@@ -14161,15 +14331,15 @@ index 00000000..fffac653
 +    // ==============================================
 +    // 打印RPMB_Key_Storage结构体的所有字段内容
 +    // ==============================================
-+    DMSG("[RPMB CRC Verify] Start printing RPMB_Key_Storage content:\n");
++    // DMSG("[RPMB CRC Verify] Start printing RPMB_Key_Storage content:\n");
 +    
-+    // 1. 打印基础数值字段
-+    DMSG("[RPMB CRC Verify] crc32_value:  0x%08X\n", storage->crc32_value);
-+    DMSG("[RPMB CRC Verify] rpmb_key_id:   0x%08X\n", storage->rpmb_key_id);
-+    DMSG("[RPMB CRC Verify] is_valid:      0x%02X (%d)\n", storage->is_valid, storage->is_valid);
++    // // 1. 打印基础数值字段
++    // DMSG("[RPMB CRC Verify] crc32_value:  0x%08X\n", storage->crc32_value);
++    // DMSG("[RPMB CRC Verify] rpmb_key_id:   0x%08X\n", storage->rpmb_key_id);
++    // DMSG("[RPMB CRC Verify] is_valid:      0x%02X (%d)\n", storage->is_valid, storage->is_valid);
 +
 +    // 2. 打印key_len二维数组
-+    DMSG("[RPMB CRC Verify] key_len array:\n");
++    // DMSG("[RPMB CRC Verify] key_len array:\n");
 +    // for (int group = 0; group < KEY_GROUP_COUNT; group++) {
 +    //     for (int key = 0; key < KEY_PER_GROUP; key++) {
 +    //         DMSG("[RPMB CRC Verify]   key_len[%d][%d]: 0x%08X (%u)\n", 
@@ -14178,7 +14348,7 @@ index 00000000..fffac653
 +    // }
 +
 +    // 3. 打印key_data三维字节数组（密钥数据，十六进制格式）
-+    DMSG("[RPMB CRC Verify] key_data array (hex format):\n");
++    // DMSG("[RPMB CRC Verify] key_data array (hex format):\n");
 +    // for (int group = 0; group < KEY_GROUP_COUNT; group++) {
 +    //     for (int key = 0; key < KEY_PER_GROUP; key++) {
 +    //         DMSG("[RPMB CRC Verify]   key_data[%d][%d]: ", group, key);
@@ -14193,7 +14363,7 @@ index 00000000..fffac653
 +    //         DMSG("\n");
 +    //     }
 +    // }
-+    DMSG("[RPMB CRC Verify] Finish printing RPMB_Key_Storage content\n");
++    // DMSG("[RPMB CRC Verify] Finish printing RPMB_Key_Storage content\n");
 +
 +    // 1. Determine valid data area
 +    const uint8_t *valid_data_start = (const uint8_t *)&(storage->rpmb_key_id);
@@ -14203,8 +14373,8 @@ index 00000000..fffac653
 +    uint32_t current_crc = calculate_crc32(valid_data_start, valid_data_len);
 +
 +    // 3. Print CRC values (hex format for standard CRC32 representation)
-+    DMSG("[RPMB CRC Verify] Calculated CRC32 value: 0x%08X\n", current_crc);
-+    DMSG("[RPMB CRC Verify] Stored CRC32 value:    0x%08X\n", storage->crc32_value);
++    // DMSG("[RPMB CRC Verify] Calculated CRC32 value: 0x%08X\n", current_crc);
++    // DMSG("[RPMB CRC Verify] Stored CRC32 value:    0x%08X\n", storage->crc32_value);
 +
 +    // 4. Compare recalculated CRC with stored CRC in structure
 +    if (current_crc == storage->crc32_value) {
@@ -14245,20 +14415,39 @@ index 00000000..fffac653
 +
 +static int rpmb_cache_alloc_or_find_idx(uint32_t target_key_id)
 +{
-+    // 先查找已存在的key_id缓存
-+    for (int i = 0; i < RPMB_KEY_CACHE_MAX_CNT; i++) {
-+        if (g_rpmb_key_cache[i].is_valid == 1 && 
-+            g_rpmb_key_cache[i].rpmb_key_id == target_key_id) {
-+            return i;
++    if(target_key_id<100)
++    {
++        // 先查找已存在的key_id缓存
++        for (int i = 0; i < RPMB_KEY_CACHE_MAX_CNT; i++) {
++            if (g_rpmb_key_cache[i].is_valid == 1 && 
++                g_rpmb_key_cache[i].rpmb_key_id == target_key_id) {
++                return i;
++            }
 +        }
-+    }
-+    // 未找到则分配空闲下标
-+    for (int i = 0; i < RPMB_KEY_CACHE_MAX_CNT; i++) {
-+        if (g_rpmb_key_cache[i].is_valid == 0) {
-+            return i;
++        // 未找到则分配空闲下标
++        for (int i = 0; i < RPMB_KEY_CACHE_MAX_CNT; i++) {
++            if (g_rpmb_key_cache[i].is_valid == 0) {
++                return i;
++            }
 +        }
++        return -1; // 缓存池已满
 +    }
-+    return -1; // 缓存池已满
++    else{
++        // 先查找已存在的key_id缓存
++        for (int i = 0; i < RPMB_KEY_CACHE_MAX_CNT; i++) {
++            if (g_rpmb_key_cache[i].is_valid == 1 && 
++                g_rpmb_key_cache[i].rpmb_key_id == target_key_id) {
++                return i;
++            }
++        }
++        // 未找到则分配空闲下标
++        for (int i = 0; i < RPMB_KEY_CACHE_MAX_CNT; i++) {
++            if (g_rpmb_key_cache[i].is_valid == 0) {
++                return i;
++            }
++        }
++        return -1; // 缓存池已满
++    }
 +}
 +
 +/**
@@ -14336,21 +14525,6 @@ index 00000000..fffac653
 +	}
 +
 +	TEE_CloseAndDeletePersistentObject1(object);
-+
-+    /* 清理缓存 */
-+    cache_idx = rpmb_cache_alloc_or_find_idx(key_id);
-+    if (cache_idx >= 0) {
-+        // 禁用编译器优化，确保volatile变量正确写入
-+        __sync_synchronize();
-+        // 清零整个缓存项（包括is_valid）
-+        memset((void*)&g_rpmb_key_cache[cache_idx], 0, sizeof(RPMB_Key_Storage));
-+        __sync_synchronize();
-+        EMSG("Cleared rpmb cache idx=%d for key_id=0x%08x", cache_idx, key_id);
-+    } else if (cache_idx == -1) {
-+        // 缓存中未找到该key_id
-+        EMSG("No cache entry found for key_id=0x%08x", key_id);
-+    }
-+
 +	TEE_Free(obj_id);
 +
 +	return res;
@@ -14364,8 +14538,7 @@ index 00000000..fffac653
 +    const uint32_t exp_param_types =
 +        TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 +                        TEE_PARAM_TYPE_MEMREF_INPUT,
-+                        TEE_PARAM_TYPE_NONE,
-+                        TEE_PARAM_TYPE_NONE);
++                        TEE_PARAM_TYPE_NONE,TEE_PARAM_TYPE_NONE);
 +    TEE_ObjectHandle object;
 +    TEE_Result res;
 +    char *obj_id;
@@ -14383,6 +14556,12 @@ index 00000000..fffac653
 +    if (param_types != exp_param_types)
 +        return TEE_ERROR_BAD_PARAMETERS;
 +
++    // ===================== 【安全防护：空指针检查】 =====================
++    if (params[0].memref.buffer == NULL || params[1].memref.buffer == NULL) {
++        EMSG("Create object input NULL pointer!");
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++
 +    // 安全获取obj_id
 +    obj_id_sz = params[0].memref.size;
 +    obj_id = TEE_Malloc(obj_id_sz, 0);
@@ -14399,6 +14578,14 @@ index 00000000..fffac653
 +    }
 +    TEE_MemMove(data, params[1].memref.buffer, data_sz);
 +
++    // ===================== 【安全防护：异常长度拒绝写入】 =====================
++    if (data_sz == 0 || data_sz > 1024 * 16) { // 最大16K
++        EMSG("Write data size INVALID: %zu bytes", data_sz);
++        TEE_Free(obj_id);
++        TEE_Free(data);
++        return TEE_ERROR_BAD_PARAMETERS;
++    }
++
 +    // 创建RPMB持久化对象
 +    obj_data_flag = TEE_DATA_FLAG_ACCESS_READ |
 +                    TEE_DATA_FLAG_ACCESS_WRITE |
@@ -14413,6 +14600,7 @@ index 00000000..fffac653
 +        return res;
 +    }
 +    DMSG("Write data to RPMB success! key_id=0x%08X, data_len=%zu Bytes", *(uint32_t*)obj_id, data_sz);
++
 +    // 解析key_id
 +    p_rpmb_key_id = (uint32_t *)obj_id;
 +
@@ -14429,7 +14617,7 @@ index 00000000..fffac653
 +        res = TEE_WriteObjectData(object, data, data_sz);
 +        if (res != TEE_SUCCESS) {
 +            EMSG("KUK TEE_WriteObjectData failed 0x%08x", res);
-+            TEE_CloseAndDeletePersistentObject1(object);
++            TEE_CloseAndDeletePersistentObject1(object);  // 【防护：写入失败删坏块】
 +            TEE_Free(obj_id);
 +            TEE_Free(data);
 +            return res;
@@ -14437,11 +14625,21 @@ index 00000000..fffac653
 +        TEE_CloseObject(object);
 +        
 +        // 同步到KUK0缓存
-+        memset((void*)&g_kuk0_cache, 0, sizeof(KUK_RPMB_Storage));
-+        TEE_MemMove((void*)&g_kuk0_cache, data, sizeof(KUK_RPMB_Storage));
++        if(*p_rpmb_key_id == KUK0_RPMB_KEY_ID)
++        {
++             memset((void*)&g_kuk0_cache, 0, sizeof(KUK_RPMB_Storage));
++             TEE_MemMove((void*)&g_kuk0_cache, data, sizeof(KUK_RPMB_Storage));
++        }
++        else if(*p_rpmb_key_id == KUK1_RPMB_KEY_ID)
++        {
++             memset((void*)&g_kuk1_cache, 0, sizeof(KUK_RPMB_Storage));
++             TEE_MemMove((void*)&g_kuk1_cache, data, sizeof(KUK_RPMB_Storage));
++        }
++       
 +        DMSG("KUK stored to RPMB success! key_id=0x%08X, valid=%d", 
 +             *p_rpmb_key_id, ((KUK_RPMB_Storage*)data)->valid);
 +    }
++
 +    // ========== 分支2：ECC密钥统一处理 ==========
 +    else if (get_ecc_cache_by_key_id(*p_rpmb_key_id, &tmp_cache, &tmp_name) == TEE_SUCCESS) {
 +        ECC_RPMB_Key_Storage *p_ecc_data = (ECC_RPMB_Key_Storage *)data;
@@ -14473,7 +14671,7 @@ index 00000000..fffac653
 +        res = TEE_WriteObjectData(object, data, data_sz);
 +        if (res != TEE_SUCCESS) {
 +            EMSG("ECC key TEE_WriteObjectData failed 0x%08x", res);
-+            TEE_CloseAndDeletePersistentObject1(object);
++            TEE_CloseAndDeletePersistentObject1(object);  // 【防护：写入失败删坏块】
 +            TEE_Free(obj_id);
 +            TEE_Free(data);
 +            return res;
@@ -14497,11 +14695,124 @@ index 00000000..fffac653
 +            }
 +        }
 +    }
-+    // ========== 分支3：通用密钥处理 ==========
-+    else {
++
++    // ========== 分支3：下挂表密钥处理 ==========
++    else if ((*p_rpmb_key_id >= BATCH_METER) && (*p_rpmb_key_id < NORMAL_RPMB_MIN_ID)) {
++        RPMB_Key_Batch_Block *p_batch = (RPMB_Key_Batch_Block *)data;
++        uint32_t block_id        = *p_rpmb_key_id;
++        uint32_t backup_block_id = block_id + 200;  // 102 → 302
++        int      batch_idx       = block_id - BATCH_METER;
++
++        // ===================== 【安全防护：长度二次校验】 =====================
++        if (data_sz < 64 || data_sz > 4096) {
++            EMSG("Batch block size abnormal: %zu", data_sz);
++            TEE_CloseAndDeletePersistentObject1(object);
++            TEE_Free(obj_id);
++            TEE_Free(data);
++            return TEE_ERROR_BAD_PARAMETERS;
++        }
++
++        // 1. Check data size exactly 5880
++        if (data_sz != sizeof(RPMB_Key_Batch_Block)) {
++            EMSG("Batch block size mismatch! exp %zu, got %zu", sizeof(RPMB_Key_Batch_Block), data_sz);
++            res = TEE_ERROR_BAD_PARAMETERS;
++        }
++        // 2. Check batch index range
++        else if (batch_idx < 0 || batch_idx >= MAX_BATCH_BLOCKS) {
++            EMSG("Batch block %u out of range", block_id);
++            res = TEE_ERROR_BAD_PARAMETERS;
++        }
++        else
++        {
++            // 3. Auto set is_valid + compute CRC for ALL 10 items
++            for (int i = 0; i < 10; i++) {
++                RPMB_Key_Storage *p_item = &p_batch->items[i];
++                if (p_item->rpmb_key_id != 0) {
++                    p_item->is_valid = 1;
++                }
++                update_rpmb_key_crc(p_item);
++            }
++
++            // ===================== 第一步：写入备份块 302 =====================
++            TEE_ObjectHandle backup_object = TEE_HANDLE_NULL;
++            res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE,
++                                            &backup_block_id, sizeof(backup_block_id),
++                                            obj_data_flag,
++                                            TEE_HANDLE_NULL,
++                                            NULL, 0,
++                                            &backup_object);
++            if (res == TEE_SUCCESS) {
++                res = TEE_WriteObjectData(backup_object, data, data_sz);
++            }
++
++            if (res != TEE_SUCCESS) {
++                EMSG("Backup block %u write failed 0x%08x", backup_block_id, res);
++            } else {
++                DMSG("Backup block %u write success", backup_block_id);
++                // ===================== 第二步：写入主块 102 =====================
++                res = TEE_WriteObjectData(object, data, data_sz);
++                if (res != TEE_SUCCESS) {
++                    EMSG("Main block %u write failed 0x%08x", block_id, res);
++                    TEE_CloseAndDeletePersistentObject1(object);
++                } else {
++                    TEE_CloseObject(object);
++                    DMSG("Main block %u write success", block_id);
++
++                    // ===================== 第三步：同步到缓存 =====================
++                    TEE_MemMove(&g_rpmb_batch_cache[batch_idx], data, sizeof(RPMB_Key_Batch_Block));
++                    TEE_CacheClean((void*)g_rpmb_batch_cache, sizeof(g_rpmb_batch_cache));
++                    DMSG("Main block %u sync to cache[%d] success", block_id, batch_idx);
++                    
++                    res = TEE_CloseAndDeletePersistentObject1(backup_object);
++                    if (res != TEE_SUCCESS) {
++                        EMSG("Delete backup block %u failed 0x%08x", backup_block_id, res);
++                    } else {
++                        DMSG("Backup block %u delete success", backup_block_id);
++                    }
++                }
++            }
++        }
++    }
++
++    else if (*p_rpmb_key_id >= NORMAL_RPMB_MIN_ID && *p_rpmb_key_id < NORMAL_RPMB_MAX_ID) {
++        uint32_t key_id = *p_rpmb_key_id;
++        int cache_idx = key_id - NORMAL_RPMB_MIN_ID;
++
++        // 安全检查索引范围
++        if (cache_idx < 0 || cache_idx >= NORMAL_CACHE_COUNT) {
++            EMSG("[NORMAL RPMB] cache index %d out of range", cache_idx);
++            res = TEE_ERROR_BAD_PARAMETERS;
++        }
++        // 检查输入数据长度 <= 256
++        else if (data_sz > NORMAL_CACHE_BLOCK_SZ) {
++            EMSG("[NORMAL RPMB] data too big! max 256 bytes, got %zu", data_sz);
++            res = TEE_ERROR_BAD_PARAMETERS;
++        }
++        else {
++            // 1. 写入RPMB
++            res = TEE_WriteObjectData(object, data, data_sz);
++            if (res != TEE_SUCCESS) {
++                EMSG("[NORMAL RPMB] write failed 0x%08x", res);
++                TEE_CloseAndDeletePersistentObject1(object);
++            } else {
++                TEE_CloseObject(object);
++                DMSG("[NORMAL RPMB] write success! key_id=0x%08X, size=%zu", key_id, data_sz);
++
++                // 2. 同步到全局二维数组 g_normal_rpmb_cache[10][256]
++                memset(g_normal_rpmb_cache[cache_idx], 0, NORMAL_CACHE_BLOCK_SZ);
++                TEE_MemMove(g_normal_rpmb_cache[cache_idx], data, data_sz);
++                TEE_CacheClean(g_normal_rpmb_cache, sizeof(g_normal_rpmb_cache));
++                DMSG("[NORMAL RPMB] sync to cache[%d] success", cache_idx);
++            }
++        }
++    }
++
++    else
++    {
 +        RPMB_Key_Storage *p_common_data = (RPMB_Key_Storage *)data;
 +
 +        if (data_sz != sizeof(RPMB_Key_Storage)) {
++            IMSG("\r\n lml testing!!!");
 +            EMSG("Common key data size mismatch! expect %zu, got %zu", sizeof(RPMB_Key_Storage), data_sz);
 +            TEE_CloseObject(object);
 +            TEE_Free(obj_id);
@@ -14519,7 +14830,7 @@ index 00000000..fffac653
 +        res = TEE_WriteObjectData(object, data, data_sz);
 +        if (res != TEE_SUCCESS) {
 +            EMSG("Common key TEE_WriteObjectData failed 0x%08x", res);
-+            TEE_CloseAndDeletePersistentObject1(object);
++            TEE_CloseAndDeletePersistentObject1(object);  // 【防护：写入失败删坏块】
 +            TEE_Free(obj_id);
 +            TEE_Free(data);
 +            return res;
@@ -14636,39 +14947,71 @@ index 00000000..fffac653
 +    const uint32_t exp_param_types =
 +        TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 +                        TEE_PARAM_TYPE_MEMREF_OUTPUT, 
-+                        TEE_PARAM_TYPE_NONE,
-+                        TEE_PARAM_TYPE_NONE);
++                        TEE_PARAM_TYPE_NONE,TEE_PARAM_TYPE_NONE);
 +    TEE_Result res = TEE_SUCCESS;
 +    char *obj_id = NULL;
 +    size_t obj_id_sz = 0;
 +    size_t data_sz = 0;
 +    uint32_t target_key_id = 0;
++    const char *cache_name = NULL;
++    ECC_RPMB_Key_Storage *ecc_cache_node = NULL;
 +
-+    // 1. 入参类型校验
++    // 1. 入参类型合法性校验
 +    if (param_types != exp_param_types) {
 +        EMSG("\r\n param_types mismatch, exp=0x%08x, act=0x%08x", exp_param_types, param_types);
 +        return TEE_ERROR_BAD_PARAMETERS;
 +    }
 +
-+    // 2. 提取入参基本信息
++    // 2. 获取输入参数长度
 +    obj_id_sz = params[0].memref.size;
 +    data_sz = params[1].memref.size;
 +
-+    // 3. 校验obj_id长度
++    // 3. 校验密钥ID长度是否合法
 +    if (obj_id_sz < sizeof(uint32_t)) {
 +        EMSG("\r\n obj_id size too small! need at least %zu Bytes, actual %zu Bytes", 
 +             sizeof(uint32_t), obj_id_sz);
 +        return TEE_ERROR_BAD_PARAMETERS;
 +    }
 +
-+    // 4. 解析目标key_id
++    // 4. 解析目标密钥ID
 +    target_key_id = *(const uint32_t *)params[0].memref.buffer;
 +    DMSG("Read target_key_id=0x%08X from RAM", target_key_id);
 +
-+    // ========== 统一处理ECC密钥 ==========
-+    ECC_RPMB_Key_Storage *ecc_cache_node = NULL;
-+    const char *cache_name = NULL;
-+    if (get_ecc_cache_by_key_id(target_key_id, &ecc_cache_node, &cache_name) == TEE_SUCCESS) {
++    // ===================== KUK0 / KUK1 读取分支（从RAM缓存） =====================
++    if (target_key_id == KUK0_RPMB_KEY_ID || target_key_id == KUK1_RPMB_KEY_ID) {
++        KUK_RPMB_Storage *kuk_cache = NULL;
++        const char *kuk_name = NULL;
++
++        // 绑定对应全局缓存
++        if (target_key_id == KUK0_RPMB_KEY_ID) {
++            kuk_cache = (KUK_RPMB_Storage *)&g_kuk0_cache;
++            kuk_name = "KUK0";
++        } else {
++            kuk_cache = (KUK_RPMB_Storage *)&g_kuk1_cache;
++            kuk_name = "KUK1";
++        }
++
++        // 校验RAM缓存有效性
++        if (kuk_cache->valid != 1) {
++            EMSG("\r\n [%s CACHE] Invalid state! valid=%d", kuk_name, kuk_cache->valid);
++            return TEE_ERROR_BAD_STATE;
++        }
++
++        // 校验输出缓冲区大小
++        size_t kuk_len = sizeof(KUK_RPMB_Storage);
++        if (kuk_len > data_sz) {
++            params[1].memref.size = kuk_len;
++            EMSG("\r\n [%s CACHE] Buffer too small! need %zu Bytes", kuk_name, kuk_len);
++            return TEE_ERROR_SHORT_BUFFER;
++        }
++
++        // 从RAM缓存拷贝数据到输出参数
++        TEE_MemMove(params[1].memref.buffer, kuk_cache, kuk_len);
++        params[1].memref.size = kuk_len;
++        IMSG("\r\n [%s CACHE] Read success from RAM! key_id=0x%08X", kuk_name, target_key_id);
++    }
++    // ==========  ECC密钥读取分支 ==========
++    else if (get_ecc_cache_by_key_id(target_key_id, &ecc_cache_node, &cache_name) == TEE_SUCCESS) {
 +        size_t ecc_cache_len = sizeof(ECC_RPMB_Key_Storage);
 +
 +        // 5.1 校验ECC缓存有效性
@@ -14685,7 +15028,7 @@ index 00000000..fffac653
 +
 +        // 5.2 缓存无效判断
 +        if (!is_ecc_valid) {
-+            EMSG("\r\n [ECC CACHE(%s)] CACHE INVALID! key_id=0x%08X, no valid [group][type]", 
++            EMSG("\r\n [ECC CACHE(%s)] CACHE INVALID! key_id=0x%08X", 
 +                 cache_name, target_key_id);
 +            return TEE_ERROR_BAD_STATE;
 +        }
@@ -14694,7 +15037,6 @@ index 00000000..fffac653
 +        int crc_verify_result = verify_ecc_key_crc(ecc_cache_node);
 +        if (crc_verify_result != 0) {
 +            EMSG("\r\n [ECC CACHE(%s)] CRC VERIFY FAILED! key_id=0x%08X", cache_name, target_key_id);
-+            // ECC缓存止损：清空无效数据
 +            ecc_key_crc_fail_stop_loss(ecc_cache_node);
 +            return TEE_ERROR_BAD_PARAMETERS;
 +        }
@@ -14703,18 +15045,111 @@ index 00000000..fffac653
 +        // 5.4 校验输出缓冲区长度
 +        if (ecc_cache_len > data_sz) {
 +            params[1].memref.size = ecc_cache_len;
-+            EMSG("\r\n [ECC CACHE(%s)] Output buffer too short! need %zu Bytes, actual %zu Bytes",  
-+                 cache_name, ecc_cache_len, data_sz);
++            EMSG("\r\n [ECC CACHE(%s)] Output buffer too short!", cache_name);
 +            return TEE_ERROR_SHORT_BUFFER;
 +        }
 +
 +        // 5.5 拷贝ECC缓存数据到输出缓冲区
 +        TEE_MemMove(params[1].memref.buffer, ecc_cache_node, ecc_cache_len);
 +        params[1].memref.size = ecc_cache_len;
-+        IMSG("\r\n [ECC CACHE(%s)] READ SUCCESS! key_id=0x%08X, copy_len=%zu Bytes",
-+             cache_name, target_key_id, ecc_cache_len);
-+    } 
-+    // ========== 通用密钥缓存读取分支 ==========
++        IMSG("\r\n [ECC CACHE(%s)] READ SUCCESS!", cache_name);
++    }
++    else if ((target_key_id >= BATCH_METER)&&(target_key_id < NORMAL_RPMB_MIN_ID)) {  // 
++        uint32_t sap = target_key_id;
++
++        int block_offset   = sap - BATCH_METER;  
++        uint32_t batch_idx = block_offset / 10;    // 第几个批量块（0/1/2...）
++        int item_index     = block_offset % 10;    // 块内第几个表（0~9）
++
++        // 边界安全检查
++        if (batch_idx < 0 || batch_idx >= MAX_BATCH_BLOCKS || item_index < 0 || item_index >= 10) {
++            EMSG("\r\n[BATCH CACHE] SAP %u invalid", sap);
++            return TEE_ERROR_BAD_PARAMETERS;
++        }
++
++        // 从全局缓存取批量块 + 对应子项
++        TEE_CacheInvalidate((void*)g_rpmb_batch_cache, sizeof(g_rpmb_batch_cache));
++
++        RPMB_Key_Batch_Block *p_batch = &g_rpmb_batch_cache[batch_idx];
++        RPMB_Key_Storage     *p_item  = &p_batch->items[item_index];
++
++        //if (p_item->rpmb_key_id != sap || p_item->is_valid != 1) {
++        if( p_item->is_valid != 1) {
++            EMSG("\r\n[BATCH CACHE] SAP %u invalid state, stored id: %u .", sap, item_index);
++
++            return TEE_ERROR_BAD_STATE;
++        }
++
++        // CRC 校验
++        if (verify_rpmb_key_crc(p_item) != 0) {
++            EMSG("\r\n[BATCH CACHE] SAP %u CRC failed", sap);
++            rpmb_key_crc_fail_stop_loss(p_item);
++            return TEE_ERROR_CORRUPT_OBJECT;
++        }
++
++        // 输出缓冲区检查
++        size_t item_len = sizeof(RPMB_Key_Batch_Block);
++        if (item_len > data_sz) {
++            params[1].memref.size = item_len;
++            EMSG("\r\n[BATCH CACHE] buffer too small for SAP %u", sap);
++            return TEE_ERROR_SHORT_BUFFER;
++        }
++
++        // 拷贝数据到输出
++        // TEE_MemMove(params[1].memref.buffer, p_item, item_len);
++        // params[1].memref.size = item_len;
++        TEE_MemMove(params[1].memref.buffer, p_batch, item_len);
++        params[1].memref.size = item_len;
++
++        DMSG("[BATCH READ] DUMP block id=0x%08X, idx=%d, size=%zu", target_key_id, batch_idx, item_len);
++        // for (int i = 0; i < 10; i++) {
++        //     RPMB_Key_Storage *it = &p_batch->items[i];
++        //     DMSG("[BATCH READ] ITEM %2d: id=0x%08X, valid=%u, crc=0x%08X",
++        //         i, it->rpmb_key_id, it->is_valid, it->crc32_value);
++
++        //     // Print first 16 bytes of key_data
++        //     DMSG("[BATCH READ] ITEM %2d: key_data[0-15] = %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
++        //         i,
++        //         it->key_data[0][0][0], it->key_data[0][0][1],
++        //         it->key_data[0][0][2], it->key_data[0][0][3],
++        //         it->key_data[0][0][4], it->key_data[0][0][5],
++        //         it->key_data[0][0][6], it->key_data[0][0][7],
++        //         it->key_data[0][0][8], it->key_data[0][0][9],
++        //         it->key_data[0][0][10], it->key_data[0][0][11],
++        //         it->key_data[0][0][12], it->key_data[0][0][13],
++        //         it->key_data[0][0][14], it->key_data[0][0][15]);
++        // }
++
++
++        DMSG("\r\n[BATCH CACHE] SAP %u read success", sap);
++    }
++    else if (target_key_id >= NORMAL_RPMB_MIN_ID && target_key_id < NORMAL_RPMB_MAX_ID)
++    {
++        int cache_idx = target_key_id - NORMAL_RPMB_MIN_ID;
++
++        // 安全检查
++        if (cache_idx < 0 || cache_idx >= 10) {
++            EMSG("\r\n [NORMAL RPMB RAM] invalid index %d", cache_idx);
++            return TEE_ERROR_BAD_PARAMETERS;
++        }
++
++        // 缓存失效，确保读最新数据
++        TEE_CacheInvalidate(g_normal_rpmb_cache, sizeof(g_normal_rpmb_cache));
++
++        size_t read_len = 256;
++        if (read_len > data_sz) {
++            params[1].memref.size = read_len;
++            EMSG("\r\n [NORMAL RPMB RAM] buffer too small need %zu", read_len);
++            return TEE_ERROR_SHORT_BUFFER;
++        }
++
++        // 直接从全局二维数组读取
++        TEE_MemMove(params[1].memref.buffer, g_normal_rpmb_cache[cache_idx], read_len);
++        params[1].memref.size = read_len;
++
++        DMSG("\r\n [NORMAL RPMB RAM] read success! key=0x%08X, idx=%d", target_key_id, cache_idx);
++    }
++    // ==========   通用密钥缓存读取分支 ==========
 +    else {
 +        int cache_idx = rpmb_cache_alloc_or_find_idx(target_key_id);
 +        DMSG("Read cache_idx=%d from RAM (Common key)", cache_idx);
@@ -14730,59 +15165,53 @@ index 00000000..fffac653
 +
 +        // 6.3 校验通用缓存有效性
 +        if (cache_node->is_valid != 1 || cache_node->rpmb_key_id != target_key_id) {
-+            EMSG("\r\n [RPMB CACHE] CACHE INVALID! key_id=0x%08X, is_valid=%d", 
-+                 target_key_id, cache_node->is_valid);
++            EMSG("\r\n [RPMB CACHE] CACHE INVALID! key_id=0x%08X", target_key_id);
 +            return TEE_ERROR_BAD_STATE;
 +        }
 +
 +        // 6.4 通用密钥CRC校验
 +        int crc_verify_result = verify_rpmb_key_crc(cache_node);
 +        if (crc_verify_result != 0) {
-+            EMSG("\r\n [RPMB CACHE] CRC VERIFY FAILED! key_id=0x%08X, cache_idx=%d", 
-+                 target_key_id, cache_idx);
-+            // 通用缓存止损
++            EMSG("\r\n [RPMB CACHE] CRC VERIFY FAILED! key_id=0x%08X", target_key_id);
 +            rpmb_key_crc_fail_stop_loss(cache_node);
 +            return TEE_ERROR_BAD_PARAMETERS;
 +        }
-+        DMSG("\r\n [RPMB CACHE] CRC VERIFY SUCCESS! key_id=0x%08X, cache_idx=%d", 
-+             target_key_id, cache_idx);
++        DMSG("\r\n [RPMB CACHE] CRC VERIFY SUCCESS! key_id=0x%08X", target_key_id);
 +
 +        // 6.5 校验输出缓冲区长度
 +        size_t cache_data_len = sizeof(RPMB_Key_Storage);
 +        if (cache_data_len > data_sz) {
 +            params[1].memref.size = cache_data_len;
-+            EMSG("\r\n [RPMB CACHE] Output buffer too short! need %zu Bytes, actual %zu Bytes", 
-+                 cache_data_len, data_sz);
++            EMSG("\r\n [RPMB CACHE] Output buffer too short!");
 +            return TEE_ERROR_SHORT_BUFFER;
 +        }
 +
 +        // 6.6 拷贝通用缓存数据到输出缓冲区
 +        TEE_MemMove(params[1].memref.buffer, cache_node, cache_data_len);
 +        params[1].memref.size = cache_data_len;
-+
-+        IMSG("\r\n [RPMB CACHE] READ SUCCESS! key_id=0x%08X, cache_idx=%d, copy_len=%zu Bytes",
-+             target_key_id, cache_idx, cache_data_len);
++        IMSG("\r\n [RPMB CACHE] READ SUCCESS! key_id=0x%08X", target_key_id);
 +    }
 +
 +    return res;
-+}
++ }
 +
 +static TEE_Result read_raw_object_to_ram(uint32_t param_types, TEE_Param params[4])
 +{
 +    const uint32_t exp_param_types =
 +        TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 +                        TEE_PARAM_TYPE_MEMREF_OUTPUT,
-+                        TEE_PARAM_TYPE_NONE,
-+                        TEE_PARAM_TYPE_NONE);
++                        TEE_PARAM_TYPE_NONE,TEE_PARAM_TYPE_NONE);
 +    TEE_ObjectHandle object = NULL;
-+    TEE_ObjectInfo object_info; 
-+    TEE_Result res = TEE_SUCCESS; // 初始化默认成功
++    TEE_ObjectInfo object_info;
++    TEE_Result res = TEE_SUCCESS;
 +    uint32_t read_bytes = 0;
 +    char *obj_id = NULL;
 +    size_t obj_id_sz = 0;
 +    char *data = NULL;
 +    size_t data_sz = 0;
 +    uint32_t target_key_id = 0;
++    const char *cache_name = NULL;
++    ECC_RPMB_Key_Storage *ecc_cache_node = NULL;
 +
 +    /* 1. 入参类型校验 */
 +    if (param_types != exp_param_types) {
@@ -14790,7 +15219,7 @@ index 00000000..fffac653
 +        return TEE_ERROR_BAD_PARAMETERS;
 +    }
 +
-+    /* 2. 安全获取obj_id（rpmb_key_id） */
++    /* 2. 安全分配内存并拷贝obj_id */
 +    obj_id_sz = params[0].memref.size;
 +    obj_id = TEE_Malloc(obj_id_sz, 0);
 +    if (!obj_id) {
@@ -14798,17 +15227,16 @@ index 00000000..fffac653
 +        return TEE_ERROR_OUT_OF_MEMORY;
 +    }
 +    TEE_MemMove(obj_id, params[0].memref.buffer, obj_id_sz);
-+    
-+    // 提前解析key_id，用于后续分支判断
++
 +    if (obj_id_sz >= sizeof(uint32_t)) {
 +        target_key_id = *(const uint32_t *)obj_id;
 +    } else {
-+        EMSG("obj_id size too small, can't parse key_id (sz=%zu)", obj_id_sz);
++        EMSG("obj_id size too small!");
 +        res = TEE_ERROR_BAD_PARAMETERS;
 +        goto exit;
 +    }
 +
-+    /* 3. 安全获取输出缓冲区 */
++    /* 3. 分配临时数据缓冲区 */
 +    data_sz = params[1].memref.size;
 +    data = TEE_Malloc(data_sz, 0);
 +    if (!data) {
@@ -14817,168 +15245,219 @@ index 00000000..fffac653
 +        goto exit;
 +    }
 +
-+    /* 4. 打开RPMB持久化对象 */
++    /* 4. 打开RPMB对象 */
 +    res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE_RPMB,
 +                    obj_id, obj_id_sz,
-+                    TEE_DATA_FLAG_ACCESS_READ | TEE_DATA_FLAG_SHARE_READ, 
++                    TEE_DATA_FLAG_ACCESS_READ,
 +                    &object);
 +    if (res != TEE_SUCCESS) {
-+        EMSG("Open RPMB object failed, res=0x%08X, key_id=0x%08X", res, target_key_id);
++        EMSG("Open RPMB object failed, res=0x%08X, key=0x%08X", res, target_key_id);
 +        goto exit;
 +    }
 +
-+    /* 5. 获取对象信息，校验缓冲区大小 */
++    // /* 5. 获取对象信息 + 【安全防护1：异常大小直接拒绝】 */
 +    res = TEE_GetObjectInfo1(object, &object_info);
 +    if (res != TEE_SUCCESS) {
-+        EMSG("Get object info failed, res=0x%08X", res);
++        EMSG("Get object info failed");
 +        goto exit;
 +    }
++
++    // 防护：拒绝0尺寸/超大尺寸数据，防止底层panic
++    if (object_info.dataSize == 0 || object_info.dataSize > 1024 * 16) {
++        EMSG("RPMB invalid data size: %u bytes", object_info.dataSize);
++        res = TEE_ERROR_CORRUPT_OBJECT;
++        goto exit;
++    }
++
 +    if (object_info.dataSize > data_sz) {
 +        params[1].memref.size = object_info.dataSize;
-+        EMSG("Output buffer too small! need %u Bytes, got %zu Bytes", object_info.dataSize, data_sz);
++        EMSG("Output buffer too small! need %u Bytes", object_info.dataSize);
 +        res = TEE_ERROR_SHORT_BUFFER;
 +        goto exit;
 +    }
 +
-+    /* 6. 读取RPMB数据到临时缓冲区 */
++    /* 6. 读取数据 + 【安全防护2：读失败自动删除坏块】 */
 +    res = TEE_ReadObjectData(object, data, object_info.dataSize, &read_bytes);
 +    if (res != TEE_SUCCESS || read_bytes != object_info.dataSize) {
-+        EMSG("Read RPMB data failed! res=0x%08X, read %" PRIu32 " / %u Bytes",res, read_bytes, object_info.dataSize);
-+        goto exit;
++        EMSG("Read RPMB data failed! res=0x%08X, read=%u", res, read_bytes);
++
++        // 核心防护：数据坏了 → 自动删除 → 永不panic
++        EMSG("Auto DELETE corrupted RPMB object!!!");
++        TEE_CloseAndDeletePersistentObject1(obj_id);
++
++        // 尝试备份块恢复
++        if (target_key_id >= BATCH_METER) {
++            uint32_t backup_key_id = target_key_id + 200;
++            EMSG("Try restore from backup: 0x%08X", backup_key_id);
++
++            if (object) {
++                TEE_CloseObject(object);
++                object = NULL;
++            }
++
++            res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE_RPMB,
++                        (void*)&backup_key_id, sizeof(backup_key_id),
++                        TEE_DATA_FLAG_ACCESS_READ, &object);
++            if (res != TEE_SUCCESS) {
++                EMSG("Open backup failed");
++                goto exit;
++            }
++
++            read_bytes = 0;
++            res = TEE_ReadObjectData(object, data, object_info.dataSize, &read_bytes);
++            if (res != TEE_SUCCESS || read_bytes != object_info.dataSize) {
++                EMSG("Backup read failed, data lost");
++                goto exit;
++            }
++            IMSG("Recovery success from backup!");
++        } else {
++            goto exit;
++        }
 +    }
++
 +    EMSG("\r\n read_bytes=%" PRIu32, read_bytes);
 +
-+    /* 7. 统一处理ECC密钥 */
-+    ECC_RPMB_Key_Storage *ecc_cache_node = NULL;
-+    const char *cache_name = NULL;
-+    if (get_ecc_cache_by_key_id(target_key_id, &ecc_cache_node, &cache_name) == TEE_SUCCESS) {
-+        // 7.1 校验ECC数据长度
++    /* ===================== KUK 分支 ===================== */
++    if (target_key_id == KUK0_RPMB_KEY_ID || target_key_id == KUK1_RPMB_KEY_ID) {
++        if (read_bytes != sizeof(KUK_RPMB_Storage)) {
++            EMSG("KUK size mismatch!");
++            res = TEE_ERROR_CORRUPT_OBJECT;
++            goto exit;
++        }
++
++        KUK_RPMB_Storage *p_kuk_data = (KUK_RPMB_Storage *)data;
++        if (p_kuk_data->valid != 1) {
++            EMSG("KUK invalid!");
++            res = TEE_ERROR_CORRUPT_OBJECT;
++            goto exit;
++        }
++
++        if (target_key_id == KUK0_RPMB_KEY_ID) {
++            memset(&g_kuk0_cache, 0, sizeof(g_kuk0_cache));
++            TEE_MemMove(&g_kuk0_cache, data, sizeof(g_kuk0_cache));
++            TEE_CacheClean(&g_kuk0_cache, sizeof(g_kuk0_cache));
++            IMSG("KUK0 sync OK");
++        } else {
++            memset(&g_kuk1_cache, 0, sizeof(g_kuk1_cache));
++            TEE_MemMove(&g_kuk1_cache, data, sizeof(g_kuk1_cache));
++            TEE_CacheClean(&g_kuk1_cache, sizeof(g_kuk1_cache));
++            IMSG("KUK1 sync OK");
++        }
++
++        TEE_MemMove(params[1].memref.buffer, data, read_bytes);
++        params[1].memref.size = read_bytes;
++    }
++    /* ===================== ECC 分支 ===================== */
++    else if (get_ecc_cache_by_key_id(target_key_id, &ecc_cache_node, &cache_name) == TEE_SUCCESS) {
 +        if (read_bytes != sizeof(ECC_RPMB_Key_Storage)) {
-+            EMSG("ECC %s data size mismatch! expect %zu, got %" PRIu32, 
-+                 cache_name, sizeof(ECC_RPMB_Key_Storage), read_bytes);
++            EMSG("ECC size mismatch!");
 +            res = TEE_ERROR_CORRUPT_OBJECT;
 +            goto exit;
 +        }
 +
-+        // 7.2 ECC专属CRC校验
 +        ECC_RPMB_Key_Storage *p_ecc_data = (ECC_RPMB_Key_Storage *)data;
-+        int crc_result = verify_ecc_key_crc(p_ecc_data);
-+        if (crc_result != 0) {
-+            EMSG("ECC %s CRC check failed! key_id=0x%08X, stored_crc=0x%08X",
-+                 cache_name, target_key_id, p_ecc_data->crc32_value);
++        if (verify_ecc_key_crc(p_ecc_data) != 0) {
++            EMSG("ECC CRC error");
 +            res = TEE_ERROR_CORRUPT_OBJECT;
 +            goto exit;
 +        }
-+        DMSG("ECC %s CRC check success! key_id=0x%08X, crc=0x%08X",
-+             cache_name, target_key_id, p_ecc_data->crc32_value);
 +
-+        // 7.3 拷贝ECC数据到输出缓冲区（含CRC）
 +        TEE_MemMove(params[1].memref.buffer, data, read_bytes);
 +        params[1].memref.size = read_bytes;
-+        
-+        // 7.4 同步ECC密钥到专属全局缓存
-+        memset((void*)ecc_cache_node, 0, sizeof(ECC_RPMB_Key_Storage));
-+        TEE_MemMove((void*)ecc_cache_node, data, sizeof(ECC_RPMB_Key_Storage));
-+        
-+        // 7.5 强制缓存刷写，确保数据同步
-+        TEE_CacheClean((void*)ecc_cache_node, sizeof(ECC_RPMB_Key_Storage));
 +
-+        
-+        // 7.6 打印ECC缓存信息
-+        IMSG("=====================================================");
-+        IMSG("[ECC CACHE(%s)] Sync success, key_id=0x%08X", cache_name, target_key_id);
-+        IMSG("[ECC CACHE] crc32_value       = 0x%08X", ecc_cache_node->crc32_value);
-+        IMSG("[ECC CACHE] Read data len     = %" PRIu32 " Bytes", read_bytes);
-+        IMSG("[ECC CACHE] Cache size        = %zu Bytes", sizeof(ECC_RPMB_Key_Storage));
-+        IMSG("=====================================================\n");
-+    } 
-+    // ---------- 通用密钥分支  ----------
++        memset(ecc_cache_node, 0, sizeof(ECC_RPMB_Key_Storage));
++        TEE_MemMove(ecc_cache_node, data, sizeof(ECC_RPMB_Key_Storage));
++        TEE_CacheClean(ecc_cache_node, sizeof(ECC_RPMB_Key_Storage));
++    }
++    /* ===================== BATCH 批量块分支 ===================== */
++    else if ((target_key_id >= BATCH_METER) && (target_key_id < NORMAL_RPMB_MIN_ID)) {
++        // 防护3：先校验长度，再强转指针
++        if (read_bytes < 64 || read_bytes > 4096) {
++            EMSG("Batch data invalid size: %" PRIu32, read_bytes);
++            res = TEE_ERROR_CORRUPT_OBJECT;
++            goto exit;
++        }
++
++        RPMB_Key_Batch_Block *p_batch_data = (RPMB_Key_Batch_Block *)data;
++        int batch_idx = target_key_id - BATCH_METER;
++
++        if (batch_idx < 0 || batch_idx >= MAX_BATCH_BLOCKS) {
++            res = TEE_ERROR_BAD_PARAMETERS;
++            goto exit;
++        }
++
++        for (int i = 0; i < 10; i++) {
++            if (verify_rpmb_key_crc(&p_batch_data->items[i]) != 0) {
++                EMSG("Batch item %d CRC error", i);
++                res = TEE_ERROR_CORRUPT_OBJECT;
++                goto exit;
++            }
++        }
++
++        TEE_MemMove(params[1].memref.buffer, data, read_bytes);
++        params[1].memref.size = read_bytes;
++
++        memset(&g_rpmb_batch_cache[batch_idx], 0, sizeof(g_rpmb_batch_cache[batch_idx]));
++        TEE_MemMove(&g_rpmb_batch_cache[batch_idx], data, sizeof(g_rpmb_batch_cache[batch_idx]));
++        TEE_CacheClean((void*)g_rpmb_batch_cache, sizeof(g_rpmb_batch_cache));
++        DMSG("Batch %u sync OK", target_key_id);
++    }
++    /* ===================== 400~499 普通分支 ===================== */
++    else if (target_key_id >= NORMAL_RPMB_MIN_ID && target_key_id < NORMAL_RPMB_MAX_ID) {
++        int cache_idx = target_key_id - NORMAL_RPMB_MIN_ID;
++
++        if (cache_idx < 0 || cache_idx >= 10 || read_bytes > 256) {
++            res = TEE_ERROR_BAD_PARAMETERS;
++            goto exit;
++        }
++
++        TEE_MemMove(params[1].memref.buffer, data, read_bytes);
++        params[1].memref.size = read_bytes;
++
++        memset(g_normal_rpmb_cache[cache_idx], 0, 256);
++        TEE_MemMove(g_normal_rpmb_cache[cache_idx], data, read_bytes);
++        TEE_CacheClean(g_normal_rpmb_cache, sizeof(g_normal_rpmb_cache));
++        DMSG("Normal RPMB %u sync OK", target_key_id);
++    }
++    /* ===================== 通用密钥分支 ===================== */
 +    else {
-+        // 校验通用密钥数据长度
 +        if (read_bytes != sizeof(RPMB_Key_Storage)) {
-+            EMSG("Common key data size mismatch! expect %zu, got %" PRIu32, 
-+                 sizeof(RPMB_Key_Storage), read_bytes);
++            EMSG("Common key size mismatch!");
 +            res = TEE_ERROR_CORRUPT_OBJECT;
 +            goto exit;
 +        }
 +
-+        // 核心：通用密钥CRC校验
 +        RPMB_Key_Storage *p_common_data = (RPMB_Key_Storage *)data;
-+        int crc_result = verify_rpmb_key_crc(p_common_data);
-+        
-+        if (crc_result != 0) {
-+            EMSG("Common key CRC check failed! key_id=0x%08X, stored_crc=0x%08X",
-+                 target_key_id, p_common_data->crc32_value);
++        if (verify_rpmb_key_crc(p_common_data) != 0) {
++            EMSG("Common key CRC error");
 +            res = TEE_ERROR_CORRUPT_OBJECT;
 +            goto exit;
 +        }
-+        DMSG("Common key CRC check success! key_id=0x%08X, crc=0x%08X",
-+             target_key_id, p_common_data->crc32_value);
-+        
-+        // 拷贝通用密钥数据到输出缓冲区
++
 +        TEE_MemMove(params[1].memref.buffer, data, read_bytes);
 +        params[1].memref.size = read_bytes;
-+        
-+        /* 同步通用密钥到全局缓存 */
++
 +        int cache_idx = rpmb_cache_alloc_or_find_idx(target_key_id);
 +        if (cache_idx >= 0) {
-+            
-+            RPMB_Key_Storage *cache_node = &g_rpmb_key_cache[cache_idx]; 
++            RPMB_Key_Storage *cache_node = &g_rpmb_key_cache[cache_idx];
 +            size_t copy_len = (read_bytes > sizeof(RPMB_Key_Storage)) ? sizeof(RPMB_Key_Storage) : read_bytes;
-+            
-+            // 拷贝完整数据（包含CRC32字段）
++
 +            TEE_MemMove(cache_node, data, copy_len);
-+            // 清零未覆盖区域
 +            if (copy_len < sizeof(RPMB_Key_Storage)) {
 +                memset((uint8_t*)cache_node + copy_len, 0x00, sizeof(RPMB_Key_Storage) - copy_len);
 +            }
-+            // 补全关键字段
 +            cache_node->rpmb_key_id = target_key_id;
 +            cache_node->is_valid = 1;
 +
-+            // 强制缓存刷写
-+            TEE_CacheClean((void*)cache_node, sizeof(RPMB_Key_Storage));
++            TEE_CacheClean(cache_node, sizeof(RPMB_Key_Storage));
 +            TEE_CacheClean((void*)g_rpmb_key_cache, sizeof(g_rpmb_key_cache));
-+            
-+            // 打印缓存信息（含CRC）
-+            IMSG("=====================================================");
-+            IMSG("[RPMB CACHE] Sync success, cache_idx = %d", cache_idx);
-+            IMSG("[RPMB CACHE] rpmb_key_id       = 0x%08X", cache_node->rpmb_key_id);
-+            IMSG("[RPMB CACHE] crc32_value       = 0x%08X", cache_node->crc32_value);
-+            IMSG("[RPMB CACHE] is_valid          = %d", cache_node->is_valid);
-+            IMSG("[RPMB CACHE] Read data len     = %" PRIu32 " Bytes", read_bytes);
-+            IMSG("[RPMB CACHE] Cache node size   = %zu Bytes", sizeof(RPMB_Key_Storage));
-+            IMSG("-----------------------------------------------------");
-+
-+            // 打印key_len
-+            IMSG("[RPMB CACHE] Key Length Table (GROUP[IDX] -> LEN):");
-+            for (int g = 0; g < KEY_GROUP_COUNT; g++) {
-+                for (int k = 0; k < KEY_PER_GROUP; k++) {
-+                    IMSG("  GROUP[%d] KEY[%d] len = %u Bytes", g, k, cache_node->key_len[g][k]);
-+                }
-+            }
-+            IMSG("-----------------------------------------------------");
-+
-+            // 打印key_data
-+            IMSG("[RPMB CACHE] Key Data Table (GROUP[IDX] -> HEX DATA):");
-+            IMSG("=====================================================\n");
-+        } else {
-+            EMSG("RPMB cache full! can't sync key_id=0x%08X", target_key_id);
 +        }
 +    }
 +
 +exit:
-+    /* 统一资源释放 */
-+    if (object) {
-+        TEE_CloseObject(object);
-+    }
-+    if (obj_id) {
-+        TEE_Free(obj_id);
-+    }
-+    if (data) {
-+        TEE_Free(data);
-+    }
-+
++    if (object) TEE_CloseObject(object);
++    if (obj_id) TEE_Free(obj_id);
++    if (data) TEE_Free(data);
 +    return res;
 +}
 +
