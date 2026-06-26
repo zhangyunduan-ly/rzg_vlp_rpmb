@@ -1,0 +1,32 @@
+From 992f6ead53c61760099b783ba802fd4dff59c6cb Mon Sep 17 00:00:00 2001
+From: zhangyunduan <zhangyunduan@linyang.com.cn>
+Date: Fri, 26 Jun 2026 11:20:33 +0800
+Subject: [PATCH 2/2] optee-os: modify the logging print level
+
+---
+ mk/config.mk | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mk/config.mk b/mk/config.mk
+index 3ac1bfb2..8208d711 100644
+--- a/mk/config.mk
++++ b/mk/config.mk
+@@ -67,13 +67,13 @@ CFG_TEE_CORE_DEBUG ?= y
+ # 2: error + info
+ # 3: error + info + debug
+ # 4: error + info + debug + flow
+-CFG_TEE_CORE_LOG_LEVEL ?= 2
++CFG_TEE_CORE_LOG_LEVEL ?= 3
+ 
+ # TA log level
+ # If user-mode library libutils.a is built with CFG_TEE_TA_LOG_LEVEL=0,
+ # TA tracing is disabled regardless of the value of CFG_TEE_TA_LOG_LEVEL
+ # when the TA is built.
+-CFG_TEE_TA_LOG_LEVEL ?= 1
++CFG_TEE_TA_LOG_LEVEL ?= 3
+ 
+ # TA enablement
+ # When defined to "y", TA traces are output according to
+-- 
+2.34.1
+
